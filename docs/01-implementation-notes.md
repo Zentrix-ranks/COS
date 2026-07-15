@@ -23,8 +23,9 @@ and a Mission Control shell rendering live-ish status.
 | DB schema | 13 forward-only migrations (`packages/db/migrations`), full schema + enums + RLS + views | doc 04 §3–§13 | ✅ done, migrates clean |
 | Agent seed | 36 agent contracts (`packages/db/seed/agents.json`, canonical from Appendix A2) + `system_settings` defaults | doc 03, doc 04 §5.1/§15, A2 | ✅ done, seeds clean & idempotent |
 | Shared types | Postgres enums as TS/zod (`@cos/shared`), doc-10 message envelope, queue/channel names | doc 04 §3, doc 10 §3 | ✅ done, typechecks |
-| Control-plane shell | Next.js App Router Mission Control screen (KPIs, departments, running agents, task queue, notifications) | doc 07 §5 | ✅ builds; placeholder data |
-| Agent runtime | BullMQ worker consuming the `runs` queue; **no-op agent** writes a run + run_step and publishes realtime status | doc 02 §3.2/§5, doc 16 §6 M0 | ✅ code + typechecks |
+| Control-plane shell | Next.js App Router Mission Control screen (KPIs, departments, running agents, task queue, notifications) reading live DB views with graceful offline fallback | doc 07 §5, §5.3 | ✅ live reads |
+| Realtime | SSE bridge (`/api/stream`) over Redis pub/sub + client refresher that refetches on worker events | doc 02 §3.1/§5, doc 07 §5.2 | ✅ done |
+| Agent runtime | BullMQ worker consuming the `runs` queue; **no-op agent** writes a run + run_step and publishes realtime status | doc 02 §3.2/§5, doc 16 §6 M0 | ✅ runs end-to-end |
 | Tool guard | MCP permission-gate seam every tool call passes through | doc 02 §6.3, doc 08 §2/§13 | ✅ scaffold |
 
 ### Verified locally
@@ -33,21 +34,23 @@ and a Mission Control shell rendering live-ish status.
   Result: 36 base tables, 3 `v_*` views, 15 enum types, 7 departments; **36 agents**
   (1 executive + 6 managers + 29 specialists); 0 dangling `reports_to` (referential
   integrity holds); seed is idempotent (re-running keeps 36 rows).
-- **Typecheck** passes for `@cos/shared`, `@cos/db`, `@cos/worker`, `@cos/web`.
-- **`next build`** compiles and prerenders Mission Control.
+- **Full M0 loop verified** (ephemeral Postgres + Redis + `next start` + worker): an enqueued
+  `noop` job is consumed by the worker → a run + run_step are recorded and the run completes;
+  the dashboard renders **live** data — running agent from `v_running_agents`, task from
+  `tasks`, notification from `notifications`, and the content KPI `2/5` computed from
+  `v_today_progress`; the SSE endpoint connects to Redis pub/sub (`event: realtime.ready`).
+  This meets the M0 DoD: *a no-op run appears live on the dashboard; schema migrated.*
+- **Typecheck** passes for `@cos/shared`, `@cos/db`, `@cos/worker`, `@cos/web`;
+  **`next build`** compiles.
 
-### Not yet done in M0 (needs provisioned infra to reach the M0 Definition of Done)
+### Remaining M0 items
 
-The M0 DoD ("a no-op run appears live on the dashboard; CI green") requires a running
-Supabase project, Redis, and a deploy target, which are not provisioned in this environment.
-Remaining M0 work:
-
-- Wire Mission Control regions to the DB views (`v_today_progress`, `v_running_agents`,
-  `v_pending_approvals`) and the realtime SSE bridge over Redis pub/sub (doc 02 §3.1).
-- Auth (Supabase) + session wiring in the control plane (doc 02 §8.1).
+- Auth (Supabase) + session wiring in the control plane (doc 02 §8.1); until then the control
+  plane connects with `DATABASE_URL` directly and RLS is exercised via the service/JWT role.
 - CI pipeline (lint + typecheck + migrate on a throwaway DB) — doc 15.
-- Cost/observability tables are present (`cost_ledger`, `run_steps`); wire the executor to
-  write them once real agents land (M1).
+- Department-tile live rollups (currently static navigation).
+- Cost/observability tables exist (`cost_ledger`, `run_steps`); the executor writes them once
+  real agents land (M1).
 
 ---
 
