@@ -7,5 +7,12 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "agents/**/*.ts", "orchestrator/**/*.ts", "tools/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "agents/**/*.ts",
+    "orchestrator/**/*.ts",
+    "tools/**/*.ts",
+    "model/**/*.ts",
+    "memory/**/*.ts"
+  ]
 }

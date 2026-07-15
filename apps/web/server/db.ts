@@ -9,7 +9,7 @@ import pg from 'pg';
 let pool: pg.Pool | null = null;
 let poolFailed = false;
 
-function getPool(): pg.Pool | null {
+export function getPool(): pg.Pool | null {
   if (poolFailed) return null;
   if (pool) return pool;
   const connectionString = process.env.DATABASE_URL;

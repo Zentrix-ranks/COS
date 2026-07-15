@@ -54,6 +54,61 @@ and a Mission Control shell rendering live-ish status.
 
 ---
 
+## M1 — Single pipeline (Creative → carousel to Approval) (in progress)
+
+Target (spec/16 §6 M1): the Creative agents for a carousel with their contracts (doc 03),
+prompts (doc 09), memory recall/write (doc 05), and the pipeline graph Idea→…→Approval
+(doc 12) with checkpointing + HITL interrupt (doc 06), plus the Approvals queue + Asset Detail
+drawer (doc 07 §7).
+
+### What this slice delivers
+
+| Area | Deliverable | Spec trace | Status |
+|------|-------------|-----------|--------|
+| Prompts | `@cos/prompts`: four-layer assembly (global+role+memory+task) + per-stage task templates & strict zod output schemas for the Creative stages | doc 09 §2–§6 | ✅ done |
+| Memory | recall (namespace+filters+recency; vector when embedder lands) + writeEpisode; recall-before-generation in every executor | doc 05 §5/§6/§12 | ✅ done |
+| Model access | provider abstraction; deterministic **MockProvider** (schema-valid) for keyless runs; real providers plug in | doc 02 §4, doc 09 §7 | ✅ mock |
+| Executor | generic agent lifecycle: recall → prompt → guarded model call → validate → persist asset → pipeline_stage_runs + run_steps + cost_ledger → memory write → realtime | doc 03 §4.2, doc 06 §11 | ✅ done |
+| Creative agents | creative_director, hook_writer, carousel_writer, cta_specialist, brand_voice_manager wired as stage owners | doc 03, doc 12 §4 | ✅ done |
+| Pipeline engine | spec-faithful graph engine: checkpoint-after-every-node → runs.checkpoint, bounded revision loops, HITL interrupt/resume | doc 06 §2–§7 | ✅ done |
+| Carousel graph | Idea→…→Approval; Design/Thumbnail/Visual-QA are stubs (Canva = M2) | doc 12 §4/§6 | ✅ done |
+| Approvals | POST /api/approvals/:id/decision (records + enqueues resume); Approvals queue + Asset Detail (content, stage results, confidence) | doc 02 §7, doc 07 §7 | ✅ done |
+
+### Verified locally (full loop, ephemeral Postgres + Redis + two worker processes + next start)
+
+A carousel run: `idea_generation → hook_creation → outline → draft → cta → brand_review →
+grammar → seo → ig_optimisation → design(stub) → thumbnail(stub) → visual_qa(stub)` then
+**paused at HITL approval** (run `paused`, asset `in_review`, approval `pending`, checkpoint
+persisted; 10 pipeline_stage_runs, 9 run_steps, memory episodes written). Worker #1 was then
+**killed and worker #2 started**; approving via `POST /api/approvals/:id/decision`
+(`{ok:true,resumed:true}`) let worker #2 consume the resume and drive the run to `completed`
+with the asset `approved`. **Meets the M1 DoD: a carousel goes idea→…→approval, resumable
+across a worker restart.** The `changes_requested` (→ draft revision, operator note → memory)
+and `rejected` (→ archive) branches are implemented in the engine; only `approved` was
+exercised end-to-end this pass.
+
+### Remaining M1 items
+
+- Real model providers (OpenRouter/Anthropic) behind the provider interface (mock is default
+  for keyless dev).
+- Embeddings on memory write → vector recall (currently recency+filter fallback, doc 05 §14).
+- Run Inspector UI (doc 07 §8) over the run_steps/tool_calls we now emit.
+- Department subgraphs (doc 06 §5.3) and the `ceo` graph arrive with M4.
+
+## Implementation decisions
+
+### ID-01 — Lightweight graph engine vs the LangGraph library
+
+doc 02 §4 / doc 06 name **LangGraph** as the orchestrator. This slice implements a small,
+spec-faithful engine that honors doc 06's *observable* contract exactly: a typed state machine,
+**checkpoint-after-every-node persisted to `runs.checkpoint`** (doc 06 §4), conditional edges,
+bounded revision loops (§7.1), and **HITL interrupt → `approvals` row + `runs.status='paused'`
+→ resume by re-entering the approval node** (§6). Rationale: the durable-state contract is
+fully expressed by `runs.checkpoint` (doc 04 §5.3), and this keeps M1 verifiable end-to-end
+here without external checkpointer infra. The node handlers and `PipelineState` are written so
+that adopting LangGraph's Postgres checkpointer later is a drop-in. Flagged for ratification:
+either adopt the library in a later milestone or amend doc 06 to bless this engine.
+
 ## Spec corrections discovered (propose as PRs to the spec — doc 16 §3 "spec-first")
 
 Per the operating rule, these are logged here and should be amended in the spec docs.

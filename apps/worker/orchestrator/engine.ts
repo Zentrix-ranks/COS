@@ -1,0 +1,123 @@
+// apps/worker/orchestrator/engine.ts
+// Spec-faithful graph engine. Source: spec/06-workflow-engine.md — typed state machine (§2),
+// checkpoint after every node into runs.checkpoint (§4), conditional edges + bounded revision
+// loops (§5.2, §7.1), HITL interrupt → approvals row + runs.status='paused' (§6), resume by
+// re-entering the approval node with the decision in state.
+//
+// Implementation decision ID-01 (docs/01-implementation-notes.md): doc 02/06 name LangGraph.
+// This lightweight engine implements doc 06's *observable* contract exactly (Postgres
+// checkpointing in runs.checkpoint, interrupt/resume, run_steps/cost). Swapping in LangGraph's
+// Postgres checkpointer later is a drop-in; the node handlers and state are unchanged.
+import { MAX_REVISIONS, type PipelineState } from '@cos/shared';
+import type { ExecCtx } from '../agents/executor.js';
+import { CAROUSEL_ORDER, type CarouselNode, runCarouselNode } from './carousel-pipeline.js';
+
+export type PipelineOutcome =
+  | { status: 'paused'; approvalId: string }
+  | { status: 'completed'; decision: 'approved' | 'rejected' }
+  | { status: 'failed'; error: string };
+
+async function checkpoint(ctx: ExecCtx, state: PipelineState): Promise<void> {
+  await ctx.db.query(
+    `update runs set checkpoint=$1, current_node=$2, steps_used=$3, updated_at=now() where id=$4`,
+    [JSON.stringify(state), state.node, state.budget.steps, ctx.runId],
+  );
+}
+
+function nextNode(current: CarouselNode): CarouselNode | 'END' {
+  const i = CAROUSEL_ORDER.indexOf(current);
+  const next = CAROUSEL_ORDER[i + 1];
+  return next ?? 'END';
+}
+
+async function setAssetStatus(ctx: ExecCtx, assetId: string, status: string): Promise<void> {
+  await ctx.db.query(`update assets set status=$1, updated_at=now() where id=$2`, [status, assetId]);
+}
+
+/**
+ * Drive the carousel pipeline from `state.node`. Returns when the run pauses at HITL approval
+ * or completes. Safe to call again on resume (with state.decision set) — it re-enters at the
+ * approval node without re-running prior side effects.
+ */
+export async function runPipeline(ctx: ExecCtx, state: PipelineState): Promise<PipelineOutcome> {
+  let node = state.node as CarouselNode;
+
+  for (;;) {
+    if (state.budget.steps > 200) {
+      await ctx.db.query(`update runs set status='failed', error=$1, finished_at=now() where id=$2`, [
+        JSON.stringify({ reason: 'step_budget_exceeded' }),
+        ctx.runId,
+      ]);
+      return { status: 'failed', error: 'step_budget_exceeded' };
+    }
+
+    // ---- Approval node: interrupt on first arrival, route on resume (doc 06 §6, doc 12 §4.13).
+    if (node === 'approval') {
+      if (!state.decision) {
+        // Auto-approve is opt-in per type above a confidence floor (doc 12 §4.13). Disabled by
+        // default (system_settings 'autoapprove.policy'), so M1 always interrupts for a human.
+        state.node = 'approval';
+        state.needsApproval = true;
+        await setAssetStatus(ctx, state.assetId, 'in_review');
+        const { rows } = await ctx.db.query<{ id: string }>(
+          `insert into approvals (asset_id, requested_by, status) values ($1,'creative_director','pending') returning id`,
+          [state.assetId],
+        );
+        await ctx.db.query(`update runs set status='paused', current_node='approval', checkpoint=$1, updated_at=now() where id=$2`, [
+          JSON.stringify(state),
+          ctx.runId,
+        ]);
+        ctx.publish({ node: 'approval', agentId: 'operator', status: 'paused', verb: 'awaiting approval' });
+        return { status: 'paused', approvalId: rows[0]!.id };
+      }
+      // Resume with a decision (doc 12 §4.13 On fail routing).
+      if (state.decision === 'approved') {
+        await setAssetStatus(ctx, state.assetId, 'approved');
+        await ctx.db.query(`update runs set status='completed', current_node='approval', finished_at=now() where id=$1`, [ctx.runId]);
+        ctx.publish({ node: 'approval', agentId: 'operator', status: 'approved' });
+        return { status: 'completed', decision: 'approved' };
+      }
+      if (state.decision === 'rejected') {
+        await setAssetStatus(ctx, state.assetId, 'archived');
+        await ctx.db.query(`update runs set status='completed', current_node='approval', finished_at=now() where id=$1`, [ctx.runId]);
+        ctx.publish({ node: 'approval', agentId: 'operator', status: 'rejected' });
+        return { status: 'completed', decision: 'rejected' };
+      }
+      // changes_requested → back to draft with the operator note injected into memory (doc 06 §6).
+      state.revisionCount += 1;
+      delete state.decision;
+      state.needsApproval = false;
+      if (state.operatorNote) {
+        await ctx.db.query(
+          `insert into memory_episodes (agent_id, namespace, asset_id, summary, payload, outcome, importance)
+           values ('brand_voice_manager','writing_style',$1,$2,$3,'neutral',0.8)`,
+          [state.assetId, `Operator change request: ${state.operatorNote}`, JSON.stringify({ note: state.operatorNote })],
+        );
+      }
+      await setAssetStatus(ctx, state.assetId, 'drafting');
+      node = 'draft';
+      state.node = node;
+      continue;
+    }
+
+    // ---- Regular / stub / gate nodes ----
+    state.node = node;
+    state.budget.steps += 1;
+    const { passed } = await runCarouselNode(ctx, node, state);
+    await checkpoint(ctx, state);
+
+    // Bounded revision loops for quality gates (doc 06 §7.1): brand_review → draft.
+    if (!passed && node === 'brand_review' && state.revisionCount < MAX_REVISIONS) {
+      state.revisionCount += 1;
+      node = 'draft';
+      continue;
+    }
+
+    const next = nextNode(node);
+    if (next === 'END') {
+      await ctx.db.query(`update runs set status='completed', finished_at=now() where id=$1`, [ctx.runId]);
+      return { status: 'completed', decision: 'approved' };
+    }
+    node = next;
+  }
+}

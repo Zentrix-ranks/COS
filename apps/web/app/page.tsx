@@ -92,6 +92,9 @@ export default async function MissionControl() {
           ZENTRIX OS <span className="text-muted">· Content Operating System</span>
         </h1>
         <div className="flex items-center gap-3">
+          <a href="/approvals" className="text-sm text-accent hover:underline">
+            Approvals{pendingReviews > 0 ? ` (${pendingReviews})` : ''}
+          </a>
           <RealtimeRefresher />
           <StatusPill label={health?.ig_health ?? health?.overall ?? (offline ? 'Unknown' : 'Excellent')} />
         </div>

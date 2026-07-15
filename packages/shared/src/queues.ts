@@ -22,6 +22,10 @@ export const REALTIME_CHANNEL = 'cos.realtime';
 export const JOBS = {
   noop: 'noop',
   dailyKickoff: 'daily_kickoff',
+  /** M1: start a carousel pipeline run for an asset (doc 12, doc 16 §6 M1). */
+  pipelineCarousel: 'pipeline.carousel',
+  /** M1: resume a pipeline run paused at the HITL approval interrupt (doc 06 §6). */
+  pipelineResume: 'pipeline.resume',
 } as const;
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];

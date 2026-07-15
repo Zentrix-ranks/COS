@@ -8,10 +8,12 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "enqueue:noop": "tsx src/enqueue-noop.ts",
+    "enqueue:carousel": "tsx src/enqueue-carousel.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cos/db": "*",
+    "@cos/prompts": "*",
     "@cos/shared": "*",
     "bullmq": "^5.12.0",
     "ioredis": "5.10.1",
