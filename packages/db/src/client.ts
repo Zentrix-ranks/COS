@@ -13,5 +13,11 @@ export function makePool(connectionString: string | undefined): pg.Pool {
         'or DATABASE_SERVICE_URL (worker). See .env.example.',
     );
   }
-  return new pg.Pool({ connectionString, max: 10 });
+  const pool = new pg.Pool({ connectionString, max: 10 });
+  // Swallow idle-client errors so a dropped backend connection never crashes the process with
+  // an unhandled 'error' event; the next query re-establishes a connection.
+  pool.on('error', () => {
+    /* idle client error — ignored; pool recovers on next acquire */
+  });
+  return pool;
 }

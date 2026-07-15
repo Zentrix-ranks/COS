@@ -83,9 +83,11 @@ export async function runStage<K extends CreativeStageKey>(
   const agent = await loadAgent(db, spec.agentId);
   ctx.publish({ node: spec.node, agentId: spec.agentId, status: 'running', verb: spec.node });
 
-  // 1. Recall (doc 05 §6). Winners for this format + brand rules + operator preferences.
+  // 1. Recall (doc 05 §6). Winners for this format (hybrid vector query on the idea/hook) +
+  //    brand rules + operator preferences.
+  const query = `${state.ideaTitle} ${state.asset.hook ?? ''} ${state.ideaAngle ?? ''}`.trim();
   const [winners, brandRules, prefs] = await Promise.all([
-    recall(db, { namespace: 'winners', filters: { format: state.format, outcome: 'success' }, k: 4 }),
+    recall(db, { namespace: 'winners', filters: { format: state.format, outcome: 'success' }, query, k: 4 }),
     recall(db, { namespace: 'brand_rules', k: 5 }),
     recall(db, { namespace: 'writing_style', k: 3 }),
   ]);

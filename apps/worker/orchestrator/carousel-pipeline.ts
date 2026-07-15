@@ -6,8 +6,6 @@
 import type { CreativeStageKey, PromptContext } from '@cos/prompts';
 import type { PipelineState } from '@cos/shared';
 import { type ExecCtx, runStage, type StageSpec } from '../agents/executor.js';
-import { publishOnce } from '../publishing/publisher.js';
-import { collectMetrics } from '../analytics/collect.js';
 
 const DEFAULT_PERSONA = {
   name: 'Aspiring prop-firm trader',
@@ -145,8 +143,8 @@ const SPECS: Record<string, RunnableStage> = {
 
 /**
  * Ordered node list for the carousel path. `cta` and `visual_qa` are sub/gate nodes.
- * M2 extends past approval into scheduling → publishing → analytics (doc 12 §4.14–§4.16).
- * Learning + memory_update arrive with M3.
+ * The pipeline ends at `scheduling`; publishing + measurement are decoupled to the
+ * publish.tick/publish.fire path so they happen at the scheduled slot (doc 14 §4.1), not inline.
  */
 export const CAROUSEL_ORDER = [
   'idea_generation',
@@ -163,8 +161,6 @@ export const CAROUSEL_ORDER = [
   'visual_qa',
   'approval',
   'scheduling',
-  'publishing',
-  'analytics',
 ] as const;
 
 export type CarouselNode = (typeof CAROUSEL_ORDER)[number];
@@ -217,36 +213,20 @@ export async function runCarouselNode(ctx: ExecCtx, node: CarouselNode, state: P
     ctx.publish({ node: 'visual_qa', agentId: 'visual_qa', status: hasDesign ? 'passed' : 'failed' });
     return { passed: hasDesign };
   }
-  // ---- Scheduling. doc 12 §4.14. Best-time model is analytics-driven in M3; M2 picks a slot.
+  // ---- Scheduling (doc 12 §4.14). Ends the pipeline; publish.tick fires the slot (doc 14 §4.1).
+  // Best-time model is analytics-driven later; a near-term slot is chosen for now.
   if (node === 'scheduling') {
     ctx.publish({ node: 'scheduling', agentId: 'scheduler', status: 'running' });
     const scheduledAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // +2h placeholder slot
     await ctx.db.query(
       `insert into schedules (asset_id, platform, scheduled_at, reason, created_by)
-       values ($1,'instagram',$2,'M2 default slot (+2h); analytics best-time in M3','scheduler')
+       values ($1,'instagram',$2,'default slot (+2h); publish.tick fires it','scheduler')
        on conflict (asset_id, platform) do nothing`,
       [state.assetId, scheduledAt.toISOString()],
     );
     await ctx.db.query(`update assets set status='scheduled', updated_at=now() where id=$1`, [state.assetId]);
     await writeStageRun(ctx, state.assetId, 'scheduling', 'scheduler', true, `scheduled ${scheduledAt.toISOString()}`);
     ctx.publish({ node: 'scheduling', agentId: 'scheduler', status: 'passed' });
-    return { passed: true };
-  }
-  // ---- Publishing (exactly-once). doc 12 §4.15, doc 04 §7.3.
-  if (node === 'publishing') {
-    ctx.publish({ node: 'publishing', agentId: 'cross_platform_publisher', status: 'running' });
-    const res = await publishOnce(ctx.db, ctx.tools.instagram, state.assetId, state.asset);
-    await ctx.db.query(`update assets set status='published', updated_at=now() where id=$1`, [state.assetId]);
-    await writeStageRun(ctx, state.assetId, 'publishing', 'cross_platform_publisher', true, `${res.alreadyPublished ? 'already published' : 'published'} ${res.externalId}`, res);
-    ctx.publish({ node: 'publishing', agentId: 'cross_platform_publisher', status: 'passed' });
-    return { passed: true };
-  }
-  // ---- Analytics (collect metrics). doc 12 §4.16. Scoring/learning are M3.
-  if (node === 'analytics') {
-    ctx.publish({ node: 'analytics', agentId: 'instagram_analyst', status: 'running' });
-    const res = await collectMetrics(ctx.db, ctx.tools.instagram, state.assetId);
-    await writeStageRun(ctx, state.assetId, 'analytics', 'instagram_analyst', true, `metrics for ${res.publications} publication(s)`, res);
-    ctx.publish({ node: 'analytics', agentId: 'instagram_analyst', status: 'passed' });
     return { passed: true };
   }
   if (node === 'approval') {

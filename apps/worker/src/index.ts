@@ -16,6 +16,8 @@ import { runDailyLoop } from '../orchestrator/daily-loop.js';
 import { computeAndWriteHealth } from '../ops/health.js';
 import { isOperationPaused } from '../ops/governance.js';
 import { notify } from '../notify/notify.js';
+import { firePublish } from '../publishing/fire.js';
+import { publishTick } from '../publishing/tick.js';
 import { type PipelineDeps, resumeCarousel, startCarousel } from '../orchestrator/carousel-run.js';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
@@ -80,6 +82,14 @@ const worker = new Worker(
         const snap = await computeAndWriteHealth(db, depth);
         return snap;
       }
+      case JOBS.publishTick: {
+        // Enqueue publish.fire for every schedule due now (doc 14 §4.1).
+        return publishTick(db, cronQueue);
+      }
+      case JOBS.publishFire: {
+        const data = job.data as { assetId: string };
+        return firePublish(db, tools, data.assetId);
+      }
       default:
         throw new Error(`Unknown job on ${QUEUES.runs}: ${job.name}`);
     }
@@ -122,6 +132,7 @@ async function registerCron(): Promise<void> {
     { name: JOBS.learn, cron: '30 5 * * *' }, // recluster + patterns + recommendations
     { name: JOBS.weeklyReport, cron: '0 9 * * 1' }, // Monday weekly report
     { name: JOBS.healthcheck, cron: '*/5 * * * *' }, // tools/queues/budgets health
+    { name: JOBS.publishTick, cron: '*/15 * * * *' }, // fire schedules due now (idempotent)
   ];
   for (const e of entries) {
     await cronQueue.add(e.name, {}, { repeat: { pattern: e.cron }, jobId: `cron:${e.name}`, removeOnComplete: 100, removeOnFail: 100 });

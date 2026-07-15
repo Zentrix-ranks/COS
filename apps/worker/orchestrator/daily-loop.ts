@@ -24,7 +24,7 @@ interface Idea {
 
 export interface DailyLoopResult {
   ideas: number;
-  published: number;
+  scheduled: number; // auto-approved → scheduled (published later at slot by publish.tick)
   pendingApproval: number;
   recommendations: number;
   weeklyReportId: string;
@@ -47,8 +47,9 @@ export async function runDailyLoop(deps: PipelineDeps): Promise<DailyLoopResult>
   await delegate(db, { from: 'ceo', to: 'creative_director', subject: "Generate today's content ideas", correlationId: corr });
   const ideas = await generateIdeas(db);
 
-  // 3. Fan-out: run each idea through the pipeline (bounded concurrency).
-  let published = 0;
+  // 3. Fan-out: run each idea through the pipeline (bounded concurrency). Auto-approved assets
+  //    end at 'scheduled'; publish.tick fires them at their slot (doc 14 §4.1).
+  let scheduled = 0;
   let pendingApproval = 0;
   for (let i = 0; i < ideas.length; i += FANOUT) {
     const batch = ideas.slice(i, i + FANOUT);
@@ -57,7 +58,7 @@ export async function runDailyLoop(deps: PipelineDeps): Promise<DailyLoopResult>
     );
     for (const o of outs) {
       if (o.status === 'paused') pendingApproval++;
-      else if (o.status === 'completed' && o.decision === 'approved') published++;
+      else if (o.status === 'completed' && o.decision === 'approved') scheduled++;
     }
   }
 
@@ -66,7 +67,7 @@ export async function runDailyLoop(deps: PipelineDeps): Promise<DailyLoopResult>
     await notify(db, {
       severity: 'warning',
       title: `${pendingApproval} asset(s) awaiting your approval`,
-      body: 'Review in the Approvals queue. High-confidence eligible formats were auto-published.',
+      body: 'Review in the Approvals queue. High-confidence eligible formats were auto-scheduled.',
       channels: ['in_app', 'slack'],
       data: { correlation_id: corr },
     });
@@ -82,12 +83,12 @@ export async function runDailyLoop(deps: PipelineDeps): Promise<DailyLoopResult>
   await notify(db, {
     severity: 'success',
     title: 'Daily loop complete',
-    body: `${ideas.length} ideas · ${published} auto-published · ${pendingApproval} awaiting approval · ${learn.recommendations} new recommendation(s).`,
+    body: `${ideas.length} ideas · ${scheduled} auto-scheduled · ${pendingApproval} awaiting approval · ${learn.recommendations} new recommendation(s).`,
     channels: ['in_app'],
     data: { correlation_id: corr, weekly_report_id: report.reportId },
   });
 
-  return { ideas: ideas.length, published, pendingApproval, recommendations: learn.recommendations, weeklyReportId: report.reportId, correlationId: corr };
+  return { ideas: ideas.length, scheduled, pendingApproval, recommendations: learn.recommendations, weeklyReportId: report.reportId, correlationId: corr };
 }
 
 /** Prioritized idea mix across all formats (doc 12 §6). Story/image are auto-approve-eligible. */

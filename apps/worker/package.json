@@ -13,6 +13,7 @@
     "enqueue:learn": "tsx src/enqueue-learn.ts",
     "enqueue:daily": "tsx src/enqueue-daily.ts",
     "enqueue:health": "tsx src/enqueue-health.ts",
+    "enqueue:tick": "tsx src/enqueue-tick.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

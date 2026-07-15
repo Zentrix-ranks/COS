@@ -103,11 +103,79 @@ function mockPoint(i: number, n: number, title: string): string {
   return `Value point ${i}: proof/example`;
 }
 
+/**
+ * Real provider via OpenRouter (doc 02 §4, doc 09 §7). Output is constrained by instructing the
+ * model to return only JSON, then zod-parsing (with one repair retry). Per-stage model routing
+ * from the agent's model_policy is a follow-up; a default model is used for now.
+ */
+export class OpenRouterProvider implements ModelProvider {
+  readonly name = 'openrouter';
+  constructor(
+    private readonly apiKey: string,
+    private readonly defaultModel = process.env.COS_OPENROUTER_MODEL ?? 'anthropic/claude-3.5-sonnet',
+  ) {}
+
+  async generate<T>(args: GenerateArgs<T>): Promise<GenerateResult<T>> {
+    const model = args.route.model && args.route.model !== 'mock' ? args.route.model : this.defaultModel;
+    const system = `${args.system}\n\nRespond with ONLY a single minified JSON object matching the required schema. No prose, no markdown fences.`;
+    const call = async (extra?: string) => {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          temperature: args.route.temperature,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: extra ? `${args.user}\n\n${extra}` : args.user },
+          ],
+        }),
+      });
+      if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+      return (await res.json()) as {
+        choices: Array<{ message: { content: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+    };
+
+    let json = await call();
+    let parsed = tryParse(args.schema, json.choices[0]?.message.content ?? '');
+    if (!parsed.ok) {
+      // One repair attempt with the validation error surfaced.
+      json = await call(`Your previous output failed validation: ${parsed.error}. Return corrected JSON only.`);
+      parsed = tryParse(args.schema, json.choices[0]?.message.content ?? '');
+      if (!parsed.ok) throw new Error(`OpenRouter output failed schema validation: ${parsed.error}`);
+    }
+    const usage = json.usage ?? {};
+    return {
+      output: parsed.value,
+      usage: {
+        tokens_in: usage.prompt_tokens ?? 0,
+        tokens_out: usage.completion_tokens ?? 0,
+        cost_usd: 0, // OpenRouter returns cost via a separate generation lookup; wire in follow-up.
+      },
+    };
+  }
+}
+
+function tryParse<T>(schema: z.ZodType<T>, content: string): { ok: true; value: T } | { ok: false; error: string } {
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) return { ok: false, error: 'no JSON object found in response' };
+  try {
+    const result = schema.safeParse(JSON.parse(match[0]));
+    return result.success ? { ok: true, value: result.data } : { ok: false, error: result.error.message };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 /** Select the provider from env. Defaults to mock unless a real key + provider are set. */
 export function getModelProvider(): ModelProvider {
   const provider = process.env.COS_MODEL_PROVIDER ?? 'mock';
-  if (provider === 'mock') return new MockProvider();
-  // Real providers (openrouter/anthropic) land here in M1+ once keys are configured.
-  // Until implemented, fail loud rather than silently mocking in staging/prod.
-  throw new Error(`Model provider '${provider}' not yet implemented; set COS_MODEL_PROVIDER=mock for local runs.`);
+  if (provider === 'openrouter') {
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) throw new Error('COS_MODEL_PROVIDER=openrouter requires OPENROUTER_API_KEY');
+    return new OpenRouterProvider(key);
+  }
+  return new MockProvider();
 }

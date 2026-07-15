@@ -259,14 +259,27 @@ health + tools + cost; `/publishing` shows published assets with reach; `/settin
 kill-switch — toggling it via `POST /api/settings` set `operation.paused=true` in the DB and
 surfaced the paused banner on Operations, then resumed and updated the budget.
 
-### Still open (need external infra or larger refactors)
+### Tail batch 2 — delivered & verified
 
-- Real provider adapters (OpenRouter/Anthropic, IG Graph, Canva) behind the existing interfaces
-  — need API keys/OAuth + a test IG account; mocks remain the keyless default.
-- Embeddings on memory/KB write → true vector recall (recency+filter fallback today).
-- Decouple publishing to a `publish.tick` fire-at-slot cron + per-tool token buckets (M2 still
-  publishes inline right after scheduling).
-- `realized_lift` measurement to fully close the learning self-correction loop (doc 13 §7.1).
+| Deliverable | Spec trace | Status |
+|-------------|-----------|--------|
+| Embeddings + true vector recall — hashing embedder (mock) + OpenAI embedder; `writeEpisode` embeds; `recall` does hybrid cosine+importance ranking | doc 05 §5/§6/§10 | ✅ verified |
+| `publish.tick` / `publish.fire` decoupling — pipeline ends at `scheduling`; a `*/15` tick fires due schedules; `firePublish` publishes + measures idempotently | doc 14 §4.1 | ✅ verified |
+| `realized_lift` measurement — accepted recommendations re-measured against their pattern's current lift → `status='measured'` (closes the self-correction loop) | doc 13 §7.1 | ✅ verified |
+| Real OpenRouter model provider — env-gated (`COS_MODEL_PROVIDER=openrouter`), JSON-constrained + zod-validated with a repair retry; mock stays default | doc 02 §4, doc 09 §7 | ✅ code (needs key to run) |
+| Pg pool `error` handler — prevents an unhandled idle-client error from crashing the worker | doc 02 §8.4 | ✅ done |
+
+Verified (ephemeral Postgres + Redis + worker): a query recalled the lexically-nearest winner
+episode (embeddings written); an approved carousel ended at `scheduled` with **no** publication,
+then `publish.tick` published it + collected metrics, and a second tick left exactly one
+publication (exactly-once); an accepted recommendation was re-measured to `realized_lift=0.152`,
+`status=measured`.
+
+### Still open (need external infra)
+
+- Real IG Graph + Canva adapters (need a test IG token + Canva OAuth); OpenRouter needs a key.
+- Per-agent per-stage model routing from `model_policy` (OpenRouter uses a default model now);
+  per-tool Redis token buckets; embedding backfill job for pre-existing rows.
 - Supabase Auth/session wiring; automated axe/Lighthouse in CI; load/soak tests to certify the
   throughput/availability NFRs in a real staging deployment.
 

@@ -23,6 +23,7 @@ export interface LearnResult extends ScoreResult {
   recommendations: number;
   forecasts: number;
   promoted: number;
+  measured: number;
 }
 
 function hookTag(hook: string | null): string {
@@ -63,7 +64,7 @@ export async function runLearning(db: Pool): Promise<LearnResult> {
   );
 
   if (rows.length === 0) {
-    return { ...scoreRes, clusters: 0, recommendations: 0, forecasts: 0, promoted: 0 };
+    return { ...scoreRes, clusters: 0, recommendations: 0, forecasts: 0, promoted: 0, measured: 0 };
   }
 
   const baseline = median(rows.map((r) => r.composite));
@@ -149,7 +150,23 @@ export async function runLearning(db: Pool): Promise<LearnResult> {
     promoted++;
   }
 
-  return { ...scoreRes, clusters: clusters.length, recommendations: winning.length, forecasts, promoted };
+  // ---- Close the loop (doc 13 §7.1): measure realized lift for accepted/implemented recs by
+  // re-checking their pattern's current avg vs the baseline recorded when the rec was made.
+  let measured = 0;
+  const accepted = await db.query<{ id: string; evidence: { dimension?: string; label?: string; baseline?: number } }>(
+    `select id, evidence from recommendations where status in ('accepted','implemented')`,
+  );
+  for (const r of accepted.rows) {
+    const ev = r.evidence ?? {};
+    const c = clusters.find((x) => x.dimension === ev.dimension && x.label === ev.label);
+    if (!c) continue;
+    const base = Number(ev.baseline ?? baseline) || baseline || 1;
+    const lift = base > 0 ? (c.avg - base) / base : 0;
+    await db.query(`update recommendations set realized_lift=$1, status='measured', updated_at=now() where id=$2`, [round(lift, 3), r.id]);
+    measured++;
+  }
+
+  return { ...scoreRes, clusters: clusters.length, recommendations: winning.length, forecasts, promoted, measured };
 }
 
 async function recommendationThreshold(db: Pool): Promise<number> {

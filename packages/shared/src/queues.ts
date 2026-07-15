@@ -32,6 +32,10 @@ export const JOBS = {
   weeklyReport: 'analytics.weekly_report',
   /** M5: tools/queues/budgets health snapshot + alerting (doc 14 §3, doc 02 §8.2). */
   healthcheck: 'ops.healthcheck',
+  /** Tail: fire any schedules due now (doc 14 §4.1). */
+  publishTick: 'publish.tick',
+  /** Tail: idempotently publish + measure one asset at its slot (doc 14 §4.1). */
+  publishFire: 'publish.fire',
 } as const;
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
