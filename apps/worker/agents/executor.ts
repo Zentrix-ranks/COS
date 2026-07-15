@@ -16,11 +16,14 @@ import type { z } from 'zod';
 import { guardedToolCall } from '../tools/guard.js';
 import { recall, writeEpisode } from '../memory/service.js';
 import type { ModelProvider } from '../model/provider.js';
+import type { CanvaAdapter } from '../tools/canva.js';
+import type { PublisherAdapter } from '../tools/instagram.js';
 
 export interface ExecCtx {
   db: Pool;
   provider: ModelProvider;
   runId: string;
+  tools: { canva: CanvaAdapter; instagram: PublisherAdapter };
   publish: (evt: { node: string; agentId: string; status: string; verb?: string }) => void;
 }
 

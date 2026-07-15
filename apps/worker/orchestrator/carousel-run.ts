@@ -5,11 +5,14 @@ import type { Pool } from '@cos/db';
 import type { ApprovalDecision, PipelineState } from '@cos/shared';
 import type { ExecCtx } from '../agents/executor.js';
 import type { ModelProvider } from '../model/provider.js';
+import type { CanvaAdapter } from '../tools/canva.js';
+import type { PublisherAdapter } from '../tools/instagram.js';
 import { type PipelineOutcome, runPipeline } from './engine.js';
 
 export interface PipelineDeps {
   db: Pool;
   provider: ModelProvider;
+  tools: { canva: CanvaAdapter; instagram: PublisherAdapter };
   publish: (evt: { runId: string; node: string; agentId: string; status: string; verb?: string }) => void;
 }
 
@@ -18,6 +21,7 @@ function execCtx(deps: PipelineDeps, runId: string): ExecCtx {
     db: deps.db,
     provider: deps.provider,
     runId,
+    tools: deps.tools,
     publish: (evt) => deps.publish({ runId, ...evt }),
   };
 }

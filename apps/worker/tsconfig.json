@@ -13,6 +13,8 @@
     "orchestrator/**/*.ts",
     "tools/**/*.ts",
     "model/**/*.ts",
-    "memory/**/*.ts"
+    "memory/**/*.ts",
+    "publishing/**/*.ts",
+    "analytics/**/*.ts"
   ]
 }

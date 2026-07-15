@@ -8,6 +8,8 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { runNoopAgent } from '../agents/noop.js';
 import { getModelProvider } from '../model/provider.js';
+import { getCanvaAdapter } from '../tools/canva.js';
+import { getPublisherAdapter } from '../tools/instagram.js';
 import { type PipelineDeps, resumeCarousel, startCarousel } from '../orchestrator/carousel-run.js';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
@@ -15,12 +17,13 @@ const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const publisher = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const db = makePool(process.env.DATABASE_SERVICE_URL ?? process.env.DATABASE_URL);
 const provider = getModelProvider();
+const tools = { canva: getCanvaAdapter(), instagram: getPublisherAdapter() };
 
 // Realtime path (doc 02 §5): worker emits → Redis pub/sub → control-plane hub → SSE → browser.
 const publish: PipelineDeps['publish'] = (evt) => {
   void publisher.publish(REALTIME_CHANNEL, JSON.stringify({ kind: 'run.status', ...evt, at: Date.now() }));
 };
-const deps: PipelineDeps = { db, provider, publish };
+const deps: PipelineDeps = { db, provider, tools, publish };
 
 const worker = new Worker(
   QUEUES.runs,

@@ -95,6 +95,40 @@ exercised end-to-end this pass.
 - Run Inspector UI (doc 07 §8) over the run_steps/tool_calls we now emit.
 - Department subgraphs (doc 06 §5.3) and the `ceo` graph arrive with M4.
 
+## M2 — Publish & measure (Instagram) (in progress)
+
+Target (spec/16 §6 M2): Design (Canva) stages, scheduling, and idempotent Instagram publishing
+with exactly-once guarantees (doc 04 §7.3), plus metric collection (instagram_analyst).
+
+### What this slice delivers
+
+| Area | Deliverable | Spec trace | Status |
+|------|-------------|-----------|--------|
+| Canva design | `CanvaAdapter` (+ MockCanvaAdapter, idempotent by asset_id+version); design & thumbnail nodes now real (no longer stubs) writing `assets.design` | doc 08 §5.1, doc 12 §4.11/§4.12 | ✅ done |
+| Publisher adapter | common `PublisherAdapter` (publish + insights); MockInstagramAdapter simulates platform idempotency (same key → same media, no re-post) | doc 08 §4.1/§4.2 | ✅ done |
+| Exactly-once publish | `publishOnce`: claim via `on conflict (asset_id,platform)`, idempotency-keyed outward call, single `published` transition, audit-logged once | doc 04 §7.3, doc 02 §8.4 | ✅ done |
+| Scheduling | scheduling node writes a `schedules` row (default +2h slot; analytics best-time is M3) | doc 12 §4.14 | ✅ done |
+| Analytics collection | `collectMetrics`: instagram_analyst reads insights per publication → `metrics` rows | doc 12 §4.16, doc 04 §8.1 | ✅ done |
+| Pipeline | approved → scheduling → publishing → analytics; run completes after metrics | doc 06 §5.2, doc 12 | ✅ done |
+
+### Verified locally (full loop, ephemeral Postgres + Redis + worker)
+
+An approved carousel ran `… → design:passed → thumbnail:passed → scheduling → publishing →
+analytics` to `completed`: asset `published`, `assets.design` set (Canva id), a `schedules`
+row created, **1 `publications` row (published) with an external id + 1 publish audit**, and
+**metrics collected + stored** (reach 6524). **Exactly-once verified:** calling `publishOnce`
+twice for the asset (simulated retry) returned `alreadyPublished` on the second call with the
+same external id, leaving **1 publications row and 1 publish audit** — no double-post. Meets
+the M2 DoD.
+
+### Remaining M2 items
+
+- Real IG Graph + Canva adapters behind the interfaces (mocks are default for keyless dev);
+  needs a test IG account token + Canva OAuth.
+- Publishing at scheduled fire-time via a scheduler/cron + dedicated publish queue (doc 14);
+  M2 publishes inline right after scheduling to prove the path.
+- Multi-window metric collection (24h/48h/7d) + Publishing/Analytics dashboard tabs (doc 07 §6).
+
 ## Implementation decisions
 
 ### ID-01 — Lightweight graph engine vs the LangGraph library

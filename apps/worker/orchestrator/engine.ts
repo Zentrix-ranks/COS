@@ -72,10 +72,13 @@ export async function runPipeline(ctx: ExecCtx, state: PipelineState): Promise<P
       }
       // Resume with a decision (doc 12 §4.13 On fail routing).
       if (state.decision === 'approved') {
+        // Approved → continue into scheduling → publishing → analytics (doc 12 §4.14–§4.16).
         await setAssetStatus(ctx, state.assetId, 'approved');
-        await ctx.db.query(`update runs set status='completed', current_node='approval', finished_at=now() where id=$1`, [ctx.runId]);
+        await ctx.db.query(`update runs set status='running', current_node='approval', updated_at=now() where id=$1`, [ctx.runId]);
         ctx.publish({ node: 'approval', agentId: 'operator', status: 'approved' });
-        return { status: 'completed', decision: 'approved' };
+        node = 'scheduling';
+        state.node = node;
+        continue;
       }
       if (state.decision === 'rejected') {
         await setAssetStatus(ctx, state.assetId, 'archived');
