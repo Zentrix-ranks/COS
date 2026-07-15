@@ -38,6 +38,19 @@ npm run db:seed
 On **Supabase**, skip step 1 (auth.users / auth.role() already exist) and point
 `DATABASE_URL` / `DATABASE_SERVICE_URL` at the project.
 
+### Per-request RLS locally (optional)
+
+RLS only restricts when the connecting role is subject to it — superusers/owners bypass it. To
+exercise RLS locally, create the RLS-subject `cos_app` role after migrating, then connect the
+control plane as it (or `SET ROLE cos_app`):
+
+```bash
+psql "$DATABASE_URL" -f packages/db/local-dev-grants.sql
+```
+
+The control plane sets `request.jwt.role` per request (see `apps/web/server/db.ts`), which the
+policies read via `auth.role()`. On Supabase this is automatic via the `authenticated` role.
+
 ## Conventions
 
 - Migrations are **forward-only**; never edit an applied migration — add a new one

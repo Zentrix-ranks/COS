@@ -303,13 +303,27 @@ carousel still schedules → `publish.tick` publishes + measures; 0 worker error
 flow through as media URLs). Exercising the real paths needs a test IG token, Canva OAuth, an
 OpenRouter key, and a Supabase project.
 
+### Tail batch 5 — per-request RLS over the direct pool (delivered & verified)
+
+| Deliverable | Spec trace | Status |
+|-------------|-----------|--------|
+| Role-scoped query helpers — every control-plane read/write runs in a transaction that sets `request.jwt.role` (which `auth.role()` reads), so RLS policies enforce per request; `@cos/db` `queryWithRole`/`withRoleClient` + web `queryAsRole`/`withRequestRoleClient` (role cached per render) | doc 04 §12, doc 02 §8.1 | ✅ verified |
+| All web server modules routed through the role-scoped path (db/operations/analytics/runs/publishing/approvals) | doc 04 §12 | ✅ done |
+| `local-dev-grants.sql` — an RLS-subject `cos_app` role + grants so RLS actually restricts locally (superusers/owners bypass) | doc 04 §12 | ✅ done |
+| SC-05 fix (migration 0015) — `approvals` had RLS on with only an UPDATE policy; added the missing SELECT policy | doc 04 §12 | ✅ done |
+
+Verified (ephemeral Postgres, connected as the non-owner `cos_app`): with `request.jwt.role` set,
+**viewer** reads assets + approvals but writes neither; **editor** writes assets but not approvals;
+**owner** writes both — exactly the doc 04 §12 policies. App-level regression: /approvals,
+/operations, /runs render through `queryAsRole`, and an approval decision flows end-to-end
+(`resumed:true` → asset scheduled). In production the control plane connects through Supabase's
+RLS-subject `authenticated` role; superuser dev connections still bypass RLS (open dev).
+
 ### Still open (need external infra)
 
-- Enforcing per-request RLS over the direct pg pool (Supabase PostgREST does this natively; our
-  workers use the service role). `roleForRequest()` exposes the role; wiring `set_config` per
-  connection is a follow-up.
 - Automated axe/Lighthouse in CI; load/soak tests to certify throughput/availability NFRs in a
-  real staging deployment; real Slack/Discord/Resend notification sinks.
+  real staging deployment; real Slack/Discord/Resend notification sinks; exercising the live
+  IG/Canva/OpenRouter/Supabase paths with credentials.
 
 ## Implementation decisions
 
@@ -337,6 +351,13 @@ specialists → 36 agents** (verified: seed loads 1 executive + 6 managers + 29 
 Recommend correcting doc 03 §2 to "29 specialists = 36 agents" and updating the "35 agent
 seed rows" phrasing in doc 04 §15 and doc 16 §6 (M0) to 36. The seed loads all 36 from A2
 (the canonical source) rather than dropping one to match the stale total.
+
+### SC-05 — `approvals` RLS enables SELECT-denial (no read policy)
+
+doc 04 §12 enables RLS on `approvals` and defines only `approvals_decide` (UPDATE). With RLS on
+and no SELECT policy, direct reads of `approvals` return zero rows for every role — so the
+Approval service can't read the row it needs to decide. Migration `0015_rls_fixes.sql` adds an
+`approvals_read` SELECT policy for the app roles. Recommend adding it to doc 04 §12.
 
 ### SC-03 — `messages` table has no DDL in doc 04
 

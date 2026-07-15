@@ -43,9 +43,14 @@ export async function getUser(): Promise<AuthedUser | null> {
   return { id: data.user.id, email: data.user.email ?? null, role: (profile?.role as string) ?? 'viewer' };
 }
 
-/** The role to assume for RLS (doc 04 §12). Defaults to a permissive dev role when unconfigured. */
+/**
+ * The app role to assume for RLS (doc 04 §12) — set as `request.jwt.role`, which the policies
+ * read via auth.role(). Unauthenticated requests get 'viewer' (read-only). When Supabase isn't
+ * configured (dev) we assume 'owner' so a locally RLS-subject connection still has full access;
+ * production always resolves the real signed-in role.
+ */
 export async function roleForRequest(): Promise<string> {
-  if (!isAuthConfigured()) return 'service_role';
+  if (!isAuthConfigured()) return 'owner';
   const user = await getUser();
   return user?.role ?? 'viewer';
 }

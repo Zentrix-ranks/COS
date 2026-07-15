@@ -2,7 +2,7 @@
 // Analytics tab data access. Source: spec/13 §14 (analytics surface), spec/07 §6.2.
 import 'server-only';
 import type { RecommendationStatus } from '@cos/shared';
-import { getPool } from './db.js';
+import { queryAsRole } from './db.js';
 
 export interface RecommendationRow {
   id: string;
@@ -14,19 +14,12 @@ export interface RecommendationRow {
 }
 
 export async function listRecommendations(): Promise<RecommendationRow[] | null> {
-  const p = getPool();
-  if (!p) return null;
-  try {
-    const { rows } = await p.query<RecommendationRow>(
-      `select id, title, body, confidence, status, evidence
-         from recommendations
-        order by (status='proposed') desc, confidence desc, created_at desc
-        limit 20`,
-    );
-    return rows;
-  } catch {
-    return null;
-  }
+  return queryAsRole<RecommendationRow>(
+    `select id, title, body, confidence, status, evidence
+       from recommendations
+      order by (status='proposed') desc, confidence desc, created_at desc
+      limit 20`,
+  );
 }
 
 export interface ScoredAssetRow {
@@ -39,20 +32,15 @@ export interface ScoredAssetRow {
 }
 
 export async function topBottomAssets(): Promise<{ top: ScoredAssetRow[]; bottom: ScoredAssetRow[] }> {
-  const p = getPool();
-  if (!p) return { top: [], bottom: [] };
-  try {
-    const { rows } = await p.query<ScoredAssetRow>(
+  const rows =
+    (await queryAsRole<ScoredAssetRow>(
       `select distinct on (s.asset_id) s.asset_id, a.title, a.type, s.composite::float8 as composite,
               s.label, s.percentile::float8 as percentile
          from scores s join assets a on a.id = s.asset_id
         order by s.asset_id, s.scored_at desc`,
-    );
-    const sorted = [...rows].sort((a, b) => b.composite - a.composite);
-    return { top: sorted.slice(0, 5), bottom: sorted.slice(-5).reverse() };
-  } catch {
-    return { top: [], bottom: [] };
-  }
+    )) ?? [];
+  const sorted = [...rows].sort((a, b) => b.composite - a.composite);
+  return { top: sorted.slice(0, 5), bottom: sorted.slice(-5).reverse() };
 }
 
 export interface ClusterRow {
@@ -64,17 +52,12 @@ export interface ClusterRow {
 }
 
 export async function listClusters(): Promise<ClusterRow[]> {
-  const p = getPool();
-  if (!p) return [];
-  try {
-    const { rows } = await p.query<ClusterRow>(
+  return (
+    (await queryAsRole<ClusterRow>(
       `select dimension, label, size, avg_score::float8 as avg_score, confidence::float8 as confidence
          from clusters order by dimension, avg_score desc nulls last`,
-    );
-    return rows;
-  } catch {
-    return [];
-  }
+    )) ?? []
+  );
 }
 
 export interface ForecastRow {
@@ -86,31 +69,24 @@ export interface ForecastRow {
 }
 
 export async function listForecasts(): Promise<ForecastRow[]> {
-  const p = getPool();
-  if (!p) return [];
-  try {
-    const { rows } = await p.query<ForecastRow>(
+  return (
+    (await queryAsRole<ForecastRow>(
       `select distinct on (metric, horizon) metric, horizon, point::float8 as point,
               lower::float8 as lower, upper::float8 as upper
          from forecasts order by metric, horizon, created_at desc`,
-    );
-    return rows;
-  } catch {
-    return [];
-  }
+    )) ?? []
+  );
 }
 
 export async function decideRecommendation(
   id: string,
   status: Extract<RecommendationStatus, 'accepted' | 'rejected'>,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const p = getPool();
-  if (!p) return { ok: false, reason: 'db unavailable' };
-  try {
-    const res = await p.query(`update recommendations set status=$1, updated_at=now() where id=$2 and status='proposed'`, [status, id]);
-    if (res.rowCount === 0) return { ok: false, reason: 'not found or already decided' };
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, reason: (err as Error).message };
-  }
+  const rows = await queryAsRole<{ id: string }>(
+    `update recommendations set status=$1, updated_at=now() where id=$2 and status='proposed' returning id`,
+    [status, id],
+  );
+  if (rows === null) return { ok: false, reason: 'db unavailable' };
+  if (rows.length === 0) return { ok: false, reason: 'not found or already decided' };
+  return { ok: true };
 }

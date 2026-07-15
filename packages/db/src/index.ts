@@ -3,3 +3,4 @@
 // `migrate` / `seed` scripts (package.json). Typed query helpers land in M0+ as needed.
 export { makePool } from './client.js';
 export type { Pool } from './client.js';
+export { queryWithRole, withRoleClient } from './rls.js';

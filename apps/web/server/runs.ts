@@ -2,7 +2,7 @@
 // Runs & Run Inspector data. Source: spec/07 §8 (runs list + run inspector: run_steps timeline
 // with agent, input, reasoning, tool calls, output, and where an interrupt occurred), spec/06 §11.
 import 'server-only';
-import { getPool } from './db.js';
+import { queryAsRole } from './db.js';
 
 export interface RunRow {
   id: string;
@@ -16,18 +16,11 @@ export interface RunRow {
 }
 
 export async function listRuns(): Promise<RunRow[] | null> {
-  const p = getPool();
-  if (!p) return null;
-  try {
-    const { rows } = await p.query<RunRow>(
-      `select id, graph, status, current_node, cost_usd::float8 as cost_usd, steps_used,
-              started_at, finished_at
-         from runs order by started_at desc limit 30`,
-    );
-    return rows;
-  } catch {
-    return null;
-  }
+  return queryAsRole<RunRow>(
+    `select id, graph, status, current_node, cost_usd::float8 as cost_usd, steps_used,
+            started_at, finished_at
+       from runs order by started_at desc limit 30`,
+  );
 }
 
 export interface RunStepRow {
@@ -58,36 +51,29 @@ export interface RunDetail {
 }
 
 export async function getRunDetail(id: string): Promise<RunDetail | null> {
-  const p = getPool();
-  if (!p) return null;
-  try {
-    const runRes = await p.query<RunRow>(
-      `select id, graph, status, current_node, cost_usd::float8 as cost_usd, steps_used, started_at, finished_at
-         from runs where id=$1`,
+  const runs = await queryAsRole<RunRow>(
+    `select id, graph, status, current_node, cost_usd::float8 as cost_usd, steps_used, started_at, finished_at
+       from runs where id=$1`,
+    [id],
+  );
+  if (runs === null) return null;
+  const run = runs[0];
+  if (!run) return null;
+  const steps =
+    (await queryAsRole<RunStepRow>(
+      `select seq, node, agent_id, status, reasoning_summary, input, output,
+              cost_usd::float8 as cost_usd, tokens_in, tokens_out
+         from run_steps where run_id=$1 order by seq asc`,
       [id],
-    );
-    const run = runRes.rows[0];
-    if (!run) return null;
-    const steps = (
-      await p.query<RunStepRow>(
-        `select seq, node, agent_id, status, reasoning_summary, input, output,
-                cost_usd::float8 as cost_usd, tokens_in, tokens_out
-           from run_steps where run_id=$1 order by seq asc`,
-        [id],
-      )
-    ).rows;
-    const toolCalls = (
-      await p.query<ToolCallRow>(
-        `select tc.tool, tc.ok, tc.latency_ms, tc.cost_usd::float8 as cost_usd
-           from tool_calls tc join run_steps rs on rs.id = tc.run_step_id
-          where rs.run_id=$1 order by tc.created_at asc`,
-        [id],
-      )
-    ).rows;
-    // Where an interrupt occurred (HITL): the run paused at its current_node (doc 06 §6).
-    const interruptedAt = run.status === 'paused' ? run.current_node : null;
-    return { run, steps, toolCalls, interruptedAt };
-  } catch {
-    return null;
-  }
+    )) ?? [];
+  const toolCalls =
+    (await queryAsRole<ToolCallRow>(
+      `select tc.tool, tc.ok, tc.latency_ms, tc.cost_usd::float8 as cost_usd
+         from tool_calls tc join run_steps rs on rs.id = tc.run_step_id
+        where rs.run_id=$1 order by tc.created_at asc`,
+      [id],
+    )) ?? [];
+  // Where an interrupt occurred (HITL): the run paused at its current_node (doc 06 §6).
+  const interruptedAt = run.status === 'paused' ? run.current_node : null;
+  return { run, steps, toolCalls, interruptedAt };
 }
