@@ -288,12 +288,28 @@ Verified (ephemeral Postgres + Redis + worker): a carousel run recorded real per
 zero `mock`); the token bucket allowed 3 then denied at a limit of 3; the backfill job took 3
 null-embedding episodes to 0.
 
+### Tail batch 4 — env-gated real integrations (code; need credentials to exercise)
+
+| Deliverable | Spec trace | Status |
+|-------------|-----------|--------|
+| Real Instagram Graph adapter — carousel/single publish (item → CAROUSEL → media_publish) + per-media insights; gated by INSTAGRAM_GRAPH_TOKEN + business account id | doc 08 §4.1 | ✅ code |
+| Real Canva Connect adapter — brand-template autofill (or create) → async PNG export poll; gated by CANVA_ACCESS_TOKEN | doc 08 §5.1 | ✅ code |
+| Design exports → publish media URLs — `firePublish` now carries `assets.design.exports` into the publisher as `mediaUrls` | doc 08 §4.1 | ✅ verified (mock) |
+| Supabase Auth wiring — `@supabase/ssr` server client, session-refresh middleware, `getUser()`/`roleForRequest()`; gated by SUPABASE_URL + anon key | doc 02 §8.1, doc 04 §12 | ✅ code (builds) |
+
+All are env-gated: with no credentials the adapters fall back to the deterministic mocks and the
+control plane runs open, so the verified mock path is unchanged (regression-checked: an approved
+carousel still schedules → `publish.tick` publishes + measures; 0 worker errors; design exports
+flow through as media URLs). Exercising the real paths needs a test IG token, Canva OAuth, an
+OpenRouter key, and a Supabase project.
+
 ### Still open (need external infra)
 
-- Real IG Graph + Canva adapters (need a test IG token + Canva OAuth); OpenRouter needs a key
-  (per-stage routing now feeds real model ids to the provider once a key is set).
-- Supabase Auth/session wiring; automated axe/Lighthouse in CI; load/soak tests to certify the
-  throughput/availability NFRs in a real staging deployment.
+- Enforcing per-request RLS over the direct pg pool (Supabase PostgREST does this natively; our
+  workers use the service role). `roleForRequest()` exposes the role; wiring `set_config` per
+  connection is a follow-up.
+- Automated axe/Lighthouse in CI; load/soak tests to certify throughput/availability NFRs in a
+  real staging deployment; real Slack/Discord/Resend notification sinks.
 
 ## Implementation decisions
 

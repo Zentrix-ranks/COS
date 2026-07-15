@@ -25,6 +25,8 @@ export interface AssetSnapshot {
   caption?: string;
   hashtags?: string[];
   cta?: { text: string; kind?: string; placement?: string };
+  /** Hosted export URLs (from Design) — required by real platform publishers (doc 08 §4.1). */
+  mediaUrls?: string[];
 }
 
 export type ApprovalDecision = 'approved' | 'changes_requested' | 'rejected';

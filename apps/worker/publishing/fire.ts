@@ -17,9 +17,12 @@ async function loadAssetSnapshot(db: Pool, assetId: string): Promise<AssetSnapsh
     caption: string | null;
     hashtags: string[] | null;
     cta: AssetSnapshot['cta'] | null;
-  }>(`select title, hook, body, caption, hashtags, cta from assets where id=$1`, [assetId]);
+    design: { exports?: Array<{ url: string; kind: string }> } | null;
+  }>(`select title, hook, body, caption, hashtags, cta, design from assets where id=$1`, [assetId]);
   const a = rows[0];
   if (!a) throw new Error(`asset ${assetId} not found`);
+  // Hosted image exports become the publish media URLs (doc 08 §4.1 / §5.1).
+  const mediaUrls = (a.design?.exports ?? []).filter((e) => e.kind === 'png' || e.kind === 'jpg').map((e) => e.url);
   return {
     ...(a.title != null ? { title: a.title } : {}),
     ...(a.hook != null ? { hook: a.hook } : {}),
@@ -27,6 +30,7 @@ async function loadAssetSnapshot(db: Pool, assetId: string): Promise<AssetSnapsh
     ...(a.caption != null ? { caption: a.caption } : {}),
     ...(a.hashtags != null ? { hashtags: a.hashtags } : {}),
     ...(a.cta != null ? { cta: a.cta } : {}),
+    ...(mediaUrls.length ? { mediaUrls } : {}),
   };
 }
 

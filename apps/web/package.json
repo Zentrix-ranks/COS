@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@cos/shared": "*",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
     "ioredis": "5.10.1",
     "next": "^14.2.5",
     "pg": "^8.13.0",
