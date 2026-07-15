@@ -26,6 +26,8 @@ export const JOBS = {
   pipelineCarousel: 'pipeline.carousel',
   /** M1: resume a pipeline run paused at the HITL approval interrupt (doc 06 §6). */
   pipelineResume: 'pipeline.resume',
+  /** M3: run the learning loop — score → cluster → recommend → forecast → promote (doc 13). */
+  learn: 'analytics.learn',
 } as const;
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];

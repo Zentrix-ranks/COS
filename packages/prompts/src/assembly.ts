@@ -43,19 +43,25 @@ export interface MemoryBlock {
   failures: string[];
   brand_rules: string[];
   preferences: string[];
+  /** Analytics recommendations feeding ideation (doc 13 §7 → doc 12 §4.3). */
+  recommendations?: string[];
 }
 
 /** Memory + KB context block (doc 09 §5, doc 05 §6.3). */
 export function memoryBlock(m: MemoryBlock): string {
   const line = (xs: string[]) => (xs.length ? xs.join('; ') : 'none on record');
-  return [
+  const lines = [
     '[MEMORY]',
     `Winning patterns (recall): ${line(m.winners)}`,
     `Failures to avoid: ${line(m.failures)}`,
     `Brand rules (MUST follow): ${line(m.brand_rules)}`,
     `Operator preferences: ${line(m.preferences)}`,
-    '[/MEMORY]',
-  ].join('\n');
+  ];
+  if (m.recommendations && m.recommendations.length) {
+    lines.push(`Analytics recommendations (prioritise): ${line(m.recommendations)}`);
+  }
+  lines.push('[/MEMORY]');
+  return lines.join('\n');
 }
 
 export interface AssembledPrompt {

@@ -10,6 +10,7 @@
     "enqueue:noop": "tsx src/enqueue-noop.ts",
     "enqueue:carousel": "tsx src/enqueue-carousel.ts",
     "enqueue:resume": "tsx src/enqueue-resume.ts",
+    "enqueue:learn": "tsx src/enqueue-learn.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

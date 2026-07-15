@@ -46,6 +46,25 @@ export async function recall(db: Pool, args: RecallArgs): Promise<RecalledEpisod
   }
 }
 
+/**
+ * Recall active analytics recommendations for a department, to feed ideation (doc 13 §7 →
+ * doc 12 §4.3). Returns compact "make more of X" lines ordered by confidence.
+ */
+export async function recallRecommendations(db: Pool, targetDept: string, k = 3): Promise<string[]> {
+  try {
+    const { rows } = await db.query<{ title: string; body: string }>(
+      `select title, body from recommendations
+        where status in ('proposed','accepted','implemented') and (target_dept = $1 or target_dept is null)
+        order by (status='accepted') desc, confidence desc, created_at desc
+        limit $2`,
+      [targetDept, k],
+    );
+    return rows.map((r) => r.body || r.title);
+  } catch {
+    return [];
+  }
+}
+
 export interface WriteEpisodeArgs {
   agentId: string;
   namespace: string;

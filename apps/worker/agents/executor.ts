@@ -14,7 +14,7 @@ import {
 import type { PipelineStage, PipelineState, StageResult } from '@cos/shared';
 import type { z } from 'zod';
 import { guardedToolCall } from '../tools/guard.js';
-import { recall, writeEpisode } from '../memory/service.js';
+import { recall, recallRecommendations, writeEpisode } from '../memory/service.js';
 import type { ModelProvider } from '../model/provider.js';
 import type { CanvaAdapter } from '../tools/canva.js';
 import type { PublisherAdapter } from '../tools/instagram.js';
@@ -95,6 +95,14 @@ export async function runStage<K extends CreativeStageKey>(
     brand_rules: brandRules.map((r) => r.summary),
     preferences: prefs.map((p) => p.summary),
   };
+  // Ideation is steered by analytics recommendations (doc 13 §7 → doc 12 §4.3).
+  if (spec.kind === 'idea_generation') {
+    const recs = await recallRecommendations(db, agent.department, 3);
+    if (recs.length) {
+      memory.recommendations = recs;
+      state.memoryUsed.push(...recs.map((r) => `rec: ${r}`));
+    }
+  }
   state.memoryUsed.push(...memory.winners, ...memory.brand_rules);
 
   // 2. Assemble prompt (doc 09 §2).
@@ -102,12 +110,19 @@ export async function runStage<K extends CreativeStageKey>(
   const task = CREATIVE_TASKS[spec.kind](promptCtx);
   const { system, user } = assemblePrompt({ agent, memory, task });
 
-  // 3. Open a run_step (doc 04 §5.4).
+  // 3. Open a run_step (doc 04 §5.4). Log the recalled memory used this step so decisions are
+  //    explainable in the Run Inspector (doc 05 §9: "every recall used ... logged on run_step").
+  const recalled = [
+    ...memory.winners.map((s) => `winner: ${s}`),
+    ...memory.brand_rules.map((s) => `rule: ${s}`),
+    ...memory.preferences.map((s) => `pref: ${s}`),
+    ...(memory.recommendations ?? []).map((s) => `rec: ${s}`),
+  ];
   const stepSeq = ++seq;
   const { rows: stepRows } = await db.query<{ id: string }>(
     `insert into run_steps (run_id, seq, node, agent_id, input, status)
      values ($1,$2,$3,$4,$5,'running') returning id`,
-    [runId, stepSeq, spec.node, spec.agentId, JSON.stringify({ promptId: `${spec.agentId}.${spec.kind}.v1` })],
+    [runId, stepSeq, spec.node, spec.agentId, JSON.stringify({ promptId: `${spec.agentId}.${spec.kind}.v1`, recalled })],
   );
   const stepId = stepRows[0]!.id;
 

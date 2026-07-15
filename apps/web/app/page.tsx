@@ -95,6 +95,9 @@ export default async function MissionControl() {
           <a href="/approvals" className="text-sm text-accent hover:underline">
             Approvals{pendingReviews > 0 ? ` (${pendingReviews})` : ''}
           </a>
+          <a href="/analytics" className="text-sm text-accent hover:underline">
+            Analytics
+          </a>
           <RealtimeRefresher />
           <StatusPill label={health?.ig_health ?? health?.overall ?? (offline ? 'Unknown' : 'Excellent')} />
         </div>

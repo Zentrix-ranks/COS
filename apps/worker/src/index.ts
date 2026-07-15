@@ -10,6 +10,7 @@ import { runNoopAgent } from '../agents/noop.js';
 import { getModelProvider } from '../model/provider.js';
 import { getCanvaAdapter } from '../tools/canva.js';
 import { getPublisherAdapter } from '../tools/instagram.js';
+import { runLearning } from '../analytics/learning.js';
 import { type PipelineDeps, resumeCarousel, startCarousel } from '../orchestrator/carousel-run.js';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
@@ -42,6 +43,11 @@ const worker = new Worker(
       case JOBS.pipelineResume: {
         const data = job.data as { runId: string; decision: ApprovalDecision; note?: string };
         return resumeCarousel(deps, { runId: data.runId, decision: data.decision, note: data.note });
+      }
+      case JOBS.learn: {
+        const res = await runLearning(db);
+        console.log('[worker] learning result', res);
+        return res;
       }
       default:
         throw new Error(`Unknown job on ${QUEUES.runs}: ${job.name}`);

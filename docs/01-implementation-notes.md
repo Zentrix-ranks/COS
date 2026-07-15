@@ -129,6 +129,41 @@ the M2 DoD.
   M2 publishes inline right after scheduling to prove the path.
 - Multi-window metric collection (24h/48h/7d) + Publishing/Analytics dashboard tabs (doc 07 §6).
 
+## M3 — Learning loop (in progress)
+
+Target (spec/16 §6 M3): scoring, multi-dimensional clustering, pattern mining, the
+recommendation engine, and forecasting (doc 13), plus memory promotion; feed recommendations
+into ideation.
+
+### What this slice delivers
+
+| Area | Deliverable | Spec trace | Status |
+|------|-------------|-----------|--------|
+| Scoring | `scoreAssets`: weighted composite per asset, per-format normalization, baseline/percentile, winner/neutral/loser labels, min-sample gate | doc 13 §4, doc 04 §8.2 | ✅ done |
+| Clustering | `runLearning`: categorical clusters across format/cta/length/hook with size, avg_score, confidence | doc 13 §5, doc 04 §8.3 | ✅ done |
+| Pattern mining + recs | confidence-gated winning patterns → `recommendations` ("make more of X", evidence, lift, confidence), ranked | doc 13 §6/§7, doc 04 §8.4 | ✅ done |
+| Forecasting | `forecast`: reach/followers 7d/30d, heuristic v1 with uncertainty bands | doc 13 §8, doc 04 §8.5 | ✅ done |
+| Memory promotion | winning hook patterns promoted → `memory_semantic` (preferred_hooks) with provenance + confidence | doc 05 §5.4 | ✅ done |
+| Feeds ideation | idea_generation recalls active recommendations; every recall logged on the run_step | doc 13 §7 → doc 12 §4.3, doc 05 §9 | ✅ done |
+| Analytics tab | ranked recommendations (Accept/Reject → feeds ideation), top/bottom assets, clusters, forecast; decision API | doc 07 §6.2, doc 13 §14 | ✅ done |
+
+### Verified locally (full loop, ephemeral Postgres + Redis + worker)
+
+Seeded 8 published carousels with varied hooks + metrics (contrarian hooks engaged more). The
+learning job produced: 8 scores (3 winners / 2 losers), 8 clusters (hook: contrarian avg 0.111
+n4 vs direct 0.024 n4), **1 confidence-gated recommendation** ("Make more of hook=contrarian",
+conf 0.921) — weaker patterns correctly withheld — 4 forecasts, and 1 promoted semantic memory
+(`preferred_hooks: contrarian`, conf 0.921). A subsequent ideation run's `idea_generation`
+run_step logged its recalled memory including `rec: Make more of hook "contrarian" … (+26% vs
+baseline)`. **Meets the M3 DoD: real metrics → confidence-gated recommendations that surface in
+the Analytics tab and influence the next ideation run; memory recall demonstrably used.**
+
+### Remaining M3 items
+
+- Embedding-based semantic clustering for topic/hook dimensions (categorical for now, doc 13 §5).
+- `measure_recommendations` (realized_lift) to close the self-correction loop (doc 13 §7.1).
+- Weekly report composition + delivery (doc 13 §9); scheduled analytics jobs via cron (doc 14, M4).
+
 ## Implementation decisions
 
 ### ID-01 — Lightweight graph engine vs the LangGraph library
