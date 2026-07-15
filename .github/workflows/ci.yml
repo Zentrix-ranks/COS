@@ -1,0 +1,70 @@
+# CI — typecheck, build, and migrate+seed on a throwaway Postgres+pgvector.
+# Source: spec/15-deployment-guide.md (CI/CD), spec/04 §15 (migrations run on a throwaway DB).
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cos
+      DATABASE_SERVICE_URL: postgresql://postgres:postgres@localhost:5432/cos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck (all workspaces)
+        run: npm run typecheck
+
+      - name: Build control plane
+        run: npm run build -w @cos/web
+
+      - name: Apply Supabase local-dev shim (auth.users / auth.role)
+        run: psql "$DATABASE_URL" -f packages/db/local-dev-shim.sql
+        env:
+          PGPASSWORD: postgres
+
+      - name: Migrate + seed (throwaway DB)
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Verify seed (36 agents, referential integrity)
+        run: |
+          psql "$DATABASE_URL" -c "select count(*) as agents from agents;"
+          psql "$DATABASE_URL" -c "do \$\$ begin
+            if (select count(*) from agents) <> 36 then raise exception 'expected 36 agents'; end if;
+            if (select count(*) from agents a where a.reports_to is not null
+                 and not exists (select 1 from agents p where p.id=a.reports_to)) <> 0
+              then raise exception 'dangling reports_to'; end if;
+          end \$\$;"
+        env:
+          PGPASSWORD: postgres

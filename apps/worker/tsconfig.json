@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": ["node"],
+    "composite": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "agents/**/*.ts",
+    "orchestrator/**/*.ts",
+    "tools/**/*.ts",
+    "model/**/*.ts",
+    "memory/**/*.ts",
+    "publishing/**/*.ts",
+    "analytics/**/*.ts",
+    "comms/**/*.ts",
+    "notify/**/*.ts",
+    "ops/**/*.ts"
+  ]
+}

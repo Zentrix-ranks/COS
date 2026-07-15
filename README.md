@@ -37,8 +37,18 @@ and makes the resulting codebase far more maintainable.
 ```
 .                                   ← COS repository root
 ├── README.md                       ← you are here
+├── apps/
+│   ├── web/                        ← Next.js control plane (Mission Control) — doc 02 §11
+│   └── worker/                     ← agent runtime (BullMQ worker, no-op agent) — doc 02 §3.2
+├── packages/
+│   ├── db/                         ← schema, migrations, seed (36 agents) — doc 04
+│   ├── shared/                     ← enums, message envelope, queue names — doc 04/10
+│   ├── prompts/                    ← prompt library (doc 09) — to come
+│   └── knowledge/                  ← KB loaders/embedders (doc 11) — to come
+├── infra/                          ← IaC / deploy config (doc 15) — to come
 ├── docs/
-│   └── 00-origin-conversation.md   ← the founding conversation + the "extra step"
+│   ├── 00-origin-conversation.md   ← the founding conversation + the "extra step"
+│   └── 01-implementation-notes.md  ← build progress + spec corrections discovered
 └── spec/
     ├── 00-index.md                 ← master index + page-count map
     ├── 01-vision-and-prd.md
@@ -102,6 +112,37 @@ The Zentrix repository no longer carries the COS blueprint.
 Implementation now proceeds here, incrementally against the spec, milestone by
 milestone (M0 → M5, per `spec/01-vision-and-prd.md` §12 and `spec/16-claude-code-master-build-prompt.md`).
 See `spec/00-index.md` for the document map and conventions.
+
+**Milestones M0 → M5 are implemented and each verified end-to-end** (ephemeral Postgres +
+pgvector + Redis + worker + `next start`):
+
+- **M0 Foundations** — monorepo, full DB schema + 36-agent seed, Mission Control shell, no-op
+  worker, live DB reads + realtime SSE.
+- **M1 Single pipeline** — Creative carousel Idea→Approval on a checkpointing graph engine with
+  HITL interrupt/resume (resumable across a worker restart).
+- **M2 Publish & measure** — Canva design, scheduling, exactly-once Instagram publishing, metrics.
+- **M3 Learning loop** — scoring, clustering, confidence-gated recommendations, forecasting,
+  memory promotion; recommendations feed the next ideation.
+- **M4 Full org & daily automation** — the daily CEO loop, all formats, agent-comms protocol,
+  notifications, weekly report, cron; operator approves by exception.
+- **M5 Hardening** — budget caps, kill-switch, circuit breakers, DLQ, health/observability,
+  accessibility, runbooks + DR.
+
+See `docs/01-implementation-notes.md` for what each milestone delivers, what remains, and the
+spec corrections discovered along the way. Adapters for models (OpenRouter/Anthropic), Canva,
+and Instagram default to deterministic mocks so the whole system runs without external keys;
+real providers plug into the same interfaces for staging/production.
+
+### Quick start (developer)
+
+```bash
+npm install
+npm run typecheck                       # all packages
+psql "$DATABASE_URL" -f packages/db/local-dev-shim.sql   # plain-Postgres dev only (not Supabase)
+npm run db:migrate && npm run db:seed   # needs a Postgres with pgvector; see packages/db/README.md
+npm run dev:web                         # Mission Control at http://localhost:3000
+npm run dev:worker                      # agent runtime (needs Redis)
+```
 
 ---
 

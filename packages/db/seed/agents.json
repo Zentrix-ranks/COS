@@ -1,0 +1,2923 @@
+[
+  {
+    "id": "ceo",
+    "name": "CEO Agent",
+    "tier": "executive",
+    "department": "executive",
+    "reports_to": null,
+    "goal": "Run the daily content operation to hit growth goals, allocating work and escalating to the human by exception.",
+    "responsibilities": [
+      "interpret objectives & calendar",
+      "kick off daily loop",
+      "assign department goals",
+      "arbitrate priorities",
+      "enforce budgets",
+      "decide HITL",
+      "summarize the day"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "memory.recall",
+      "kb.search",
+      "analytics.read",
+      "notify.operator"
+    ],
+    "inputs": [
+      "objectives",
+      "calendar",
+      "prior_results",
+      "budgets",
+      "operator_directives"
+    ],
+    "outputs": [
+      "department_goals",
+      "priority_list",
+      "daily_summary",
+      "escalations"
+    ],
+    "memory_policy": {
+      "read": [
+        "strategy",
+        "results",
+        "decisions"
+      ],
+      "write": [
+        "decisions",
+        "daily_summary"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "memory.recall",
+        "kb.search",
+        "analytics.read",
+        "notify.operator"
+      ],
+      "actions": [
+        "dispatch",
+        "pause_operation",
+        "set_autoapprove"
+      ]
+    },
+    "channels": {
+      "in": [
+        "operator",
+        "cron",
+        "department_heads"
+      ],
+      "out": [
+        "department_heads",
+        "operator"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "pause_and_notify",
+      "park_state": true
+    },
+    "model_policy": {
+      "tier": "high",
+      "route": "openrouter/anthropic/claude-opus",
+      "fallbacks": [
+        "frontier_alt"
+      ],
+      "temperature": 0.4
+    },
+    "eval_policy": {
+      "primary": "daily_goal_completion",
+      "secondary": [
+        "human_minutes_per_asset",
+        "escalation_precision",
+        "budget_adherence"
+      ]
+    }
+  },
+  {
+    "id": "cso",
+    "name": "Chief Strategy Officer",
+    "tier": "manager",
+    "department": "strategy",
+    "reports_to": "ceo",
+    "goal": "Turn trends, competitors, and audience into a prioritized, evidence-backed strategy.",
+    "responsibilities": [
+      "direct strategy specialists",
+      "synthesize strategy brief",
+      "maintain personas",
+      "feed themes to Creative"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "memory.recall",
+      "kb.search",
+      "analytics.read"
+    ],
+    "inputs": [
+      "ceo_goals",
+      "specialist_findings",
+      "recommendations"
+    ],
+    "outputs": [
+      "strategy_brief",
+      "persona_updates"
+    ],
+    "memory_policy": {
+      "read": [
+        "trends",
+        "competitors",
+        "personas",
+        "winners"
+      ],
+      "write": [
+        "themes",
+        "personas"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "memory.recall",
+        "kb.search",
+        "analytics.read"
+      ],
+      "actions": [
+        "dispatch",
+        "write_personas"
+      ]
+    },
+    "channels": {
+      "in": [
+        "ceo",
+        "strategy_specialists"
+      ],
+      "out": [
+        "ceo",
+        "creative_director"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "escalate",
+      "to": "ceo",
+      "park_state": true
+    },
+    "model_policy": {
+      "tier": "high",
+      "route": "openrouter/anthropic/claude-opus",
+      "temperature": 0.5
+    },
+    "eval_policy": {
+      "primary": "idea_to_publish_conversion",
+      "secondary": [
+        "recommendation_adoption",
+        "brief_freshness"
+      ]
+    }
+  },
+  {
+    "id": "trend_researcher",
+    "name": "Trend Researcher",
+    "tier": "specialist",
+    "department": "strategy",
+    "reports_to": "cso",
+    "goal": "Detect emerging, relevant trends before they peak.",
+    "responsibilities": [
+      "scan reddit/youtube/web",
+      "score trend relevance & momentum",
+      "store with evidence",
+      "flag reactive opportunities"
+    ],
+    "tools": [
+      "reddit.search",
+      "youtube.search",
+      "firecrawl.crawl",
+      "exa.search",
+      "memory.recall",
+      "db.write_trend"
+    ],
+    "inputs": [
+      "source_config",
+      "audience_interests",
+      "niche_keywords"
+    ],
+    "outputs": [
+      "scored_trends",
+      "reactive_flags"
+    ],
+    "memory_policy": {
+      "read": [
+        "trends",
+        "winners"
+      ],
+      "write": [
+        "trends",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "reddit.search",
+        "youtube.search",
+        "firecrawl.crawl",
+        "exa.search",
+        "memory.recall",
+        "db.write_trend"
+      ],
+      "actions": [
+        "propose",
+        "write_trends"
+      ]
+    },
+    "channels": {
+      "in": [
+        "cso"
+      ],
+      "out": [
+        "cso",
+        "audience_researcher"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "degrade_to_cache",
+      "to": "cso"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.4
+    },
+    "eval_policy": {
+      "primary": "trend_to_winner_hit_rate",
+      "secondary": [
+        "lead_time",
+        "source_diversity"
+      ]
+    }
+  },
+  {
+    "id": "competitor_analyst",
+    "name": "Competitor Analyst",
+    "tier": "specialist",
+    "department": "strategy",
+    "reports_to": "cso",
+    "goal": "Track competitor output and infer what's working for them.",
+    "responsibilities": [
+      "monitor competitor cadence/formats",
+      "estimate performance signals",
+      "maintain competitor DB",
+      "surface gaps"
+    ],
+    "tools": [
+      "firecrawl.crawl",
+      "exa.search",
+      "instagram.public_read",
+      "db.write_competitor",
+      "memory.recall"
+    ],
+    "inputs": [
+      "competitor_list",
+      "formats_to_watch",
+      "our_performance"
+    ],
+    "outputs": [
+      "competitor_updates",
+      "gap_analysis",
+      "inspiration_patterns"
+    ],
+    "memory_policy": {
+      "read": [
+        "competitors"
+      ],
+      "write": [
+        "competitors",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "firecrawl.crawl",
+        "exa.search",
+        "instagram.public_read",
+        "db.write_competitor",
+        "memory.recall"
+      ],
+      "actions": [
+        "propose",
+        "write_competitors"
+      ]
+    },
+    "channels": {
+      "in": [
+        "cso"
+      ],
+      "out": [
+        "cso"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial_flagged",
+      "to": "cso"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.4
+    },
+    "eval_policy": {
+      "primary": "gap_to_idea_conversion",
+      "secondary": [
+        "freshness",
+        "signal_false_positive_rate"
+      ]
+    }
+  },
+  {
+    "id": "audience_researcher",
+    "name": "Audience Researcher",
+    "tier": "specialist",
+    "department": "strategy",
+    "reports_to": "cso",
+    "goal": "Keep an accurate, evolving model of the audience.",
+    "responsibilities": [
+      "update personas from engagement+research",
+      "identify interests/pains/language",
+      "maintain persona records"
+    ],
+    "tools": [
+      "analytics.read",
+      "reddit.search",
+      "exa.search",
+      "db.write_persona",
+      "memory.recall"
+    ],
+    "inputs": [
+      "engagement_data",
+      "comment_signals",
+      "research"
+    ],
+    "outputs": [
+      "persona_updates",
+      "interest_shifts",
+      "tone_cues"
+    ],
+    "memory_policy": {
+      "read": [
+        "personas",
+        "reactions"
+      ],
+      "write": [
+        "personas",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "analytics.read",
+        "reddit.search",
+        "exa.search",
+        "db.write_persona",
+        "memory.recall"
+      ],
+      "actions": [
+        "propose",
+        "write_personas"
+      ]
+    },
+    "channels": {
+      "in": [
+        "cso",
+        "engagement_analyst"
+      ],
+      "out": [
+        "cso",
+        "brand_voice_manager"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "keep_prior_flag_stale",
+      "to": "cso"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.4
+    },
+    "eval_policy": {
+      "primary": "persona_prediction_accuracy",
+      "secondary": [
+        "freshness"
+      ]
+    }
+  },
+  {
+    "id": "market_intelligence",
+    "name": "Market Intelligence",
+    "tier": "specialist",
+    "department": "strategy",
+    "reports_to": "cso",
+    "goal": "Supply accurate domain facts so content is correct.",
+    "responsibilities": [
+      "fetch/verify market & prop-firm facts",
+      "ground Creative",
+      "flag risky claims"
+    ],
+    "tools": [
+      "exa.search",
+      "firecrawl.crawl",
+      "perplexity.ask",
+      "kb.search",
+      "db.write_fact",
+      "memory.recall"
+    ],
+    "inputs": [
+      "pipeline_topics",
+      "claims_to_verify"
+    ],
+    "outputs": [
+      "verified_facts",
+      "risk_flags"
+    ],
+    "memory_policy": {
+      "read": [
+        "kb",
+        "facts"
+      ],
+      "write": [
+        "facts",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "exa.search",
+        "firecrawl.crawl",
+        "perplexity.ask",
+        "kb.search",
+        "db.write_fact",
+        "memory.recall"
+      ],
+      "actions": [
+        "propose",
+        "write_facts"
+      ]
+    },
+    "channels": {
+      "in": [
+        "cso",
+        "creative_director"
+      ],
+      "out": [
+        "cso",
+        "creative_director",
+        "brand_voice_manager"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "mark_unverified",
+      "to": "cso"
+    },
+    "model_policy": {
+      "tier": "high",
+      "route": "openrouter/anthropic/claude-opus",
+      "temperature": 0.2
+    },
+    "eval_policy": {
+      "primary": "factual_accuracy_rate",
+      "secondary": [
+        "claims_blocked_correctly"
+      ]
+    }
+  },
+  {
+    "id": "creative_director",
+    "name": "Creative Director",
+    "tier": "manager",
+    "department": "creative",
+    "reports_to": "ceo",
+    "goal": "Convert strategy into a slate of high-quality, on-brand drafts.",
+    "responsibilities": [
+      "turn brief into asset briefs",
+      "assign writers",
+      "review drafts",
+      "enforce brand voice",
+      "choose format",
+      "hand to Design"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "memory.recall",
+      "kb.search",
+      "analytics.read"
+    ],
+    "inputs": [
+      "strategy_brief",
+      "personas",
+      "brand_voice",
+      "format_performance"
+    ],
+    "outputs": [
+      "asset_briefs",
+      "reviewed_drafts",
+      "format_decisions"
+    ],
+    "memory_policy": {
+      "read": [
+        "winners",
+        "brand_rules",
+        "hooks"
+      ],
+      "write": [
+        "briefs",
+        "review_notes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "memory.recall",
+        "kb.search",
+        "analytics.read"
+      ],
+      "actions": [
+        "dispatch",
+        "request_design"
+      ]
+    },
+    "channels": {
+      "in": [
+        "cso",
+        "ceo"
+      ],
+      "out": [
+        "creative_specialists",
+        "design_lead"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "escalate",
+      "to": "ceo"
+    },
+    "model_policy": {
+      "tier": "high",
+      "route": "openrouter/anthropic/claude-opus",
+      "temperature": 0.6
+    },
+    "eval_policy": {
+      "primary": "approval_pass_rate",
+      "secondary": [
+        "rework_rate",
+        "format_fit_accuracy"
+      ]
+    }
+  },
+  {
+    "id": "hook_writer",
+    "name": "Hook Writer",
+    "tier": "specialist",
+    "department": "creative",
+    "reports_to": "creative_director",
+    "goal": "Produce scroll-stopping opening hooks per idea/format.",
+    "responsibilities": [
+      "generate 5-10 candidates",
+      "score & rank vs winners",
+      "supply chosen hook + rationale"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "memory.recall",
+      "kb.search"
+    ],
+    "inputs": [
+      "idea",
+      "format",
+      "persona",
+      "brand_voice"
+    ],
+    "outputs": [
+      "hook_candidates",
+      "chosen_hook",
+      "rationale"
+    ],
+    "memory_policy": {
+      "read": [
+        "hooks",
+        "winners",
+        "reactions"
+      ],
+      "write": [
+        "hooks",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "memory.recall",
+        "kb.search"
+      ],
+      "actions": [
+        "propose"
+      ]
+    },
+    "channels": {
+      "in": [
+        "creative_director"
+      ],
+      "out": [
+        "creative_director",
+        "carousel_writer",
+        "reel_writer"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "best_partial",
+      "to": "creative_director"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.85
+    },
+    "eval_policy": {
+      "primary": "hook_ctr_lift",
+      "secondary": [
+        "approval_pass_rate",
+        "diversity_score"
+      ]
+    }
+  },
+  {
+    "id": "carousel_writer",
+    "name": "Carousel Writer",
+    "tier": "specialist",
+    "department": "creative",
+    "reports_to": "creative_director",
+    "goal": "Write high-retention carousel copy slide-by-slide.",
+    "responsibilities": [
+      "structure slides hook->value->proof->CTA",
+      "concise per-slide copy",
+      "design notes for layout"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "memory.recall",
+      "kb.search"
+    ],
+    "inputs": [
+      "idea",
+      "chosen_hook",
+      "persona",
+      "brand_voice",
+      "slide_count"
+    ],
+    "outputs": [
+      "slides",
+      "caption",
+      "hashtags",
+      "cta_slot"
+    ],
+    "memory_policy": {
+      "read": [
+        "winners"
+      ],
+      "write": [
+        "drafts",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "memory.recall",
+        "kb.search"
+      ],
+      "actions": [
+        "propose"
+      ]
+    },
+    "channels": {
+      "in": [
+        "creative_director",
+        "hook_writer"
+      ],
+      "out": [
+        "creative_director",
+        "design_lead",
+        "cta_specialist"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial",
+      "to": "creative_director"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.8
+    },
+    "eval_policy": {
+      "primary": "saves_shares_lift",
+      "secondary": [
+        "approval_pass_rate"
+      ]
+    }
+  },
+  {
+    "id": "reel_writer",
+    "name": "Reel Writer",
+    "tier": "specialist",
+    "department": "creative",
+    "reports_to": "creative_director",
+    "goal": "Write reel scripts (hook, beats, on-screen text, VO, CTA).",
+    "responsibilities": [
+      "<=3s hook",
+      "retention beats",
+      "on-screen text & b-roll intent",
+      "hand motion intent to planner"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "memory.recall",
+      "kb.search"
+    ],
+    "inputs": [
+      "idea",
+      "hook",
+      "persona",
+      "brand_voice",
+      "duration"
+    ],
+    "outputs": [
+      "script",
+      "on_screen_text",
+      "vo",
+      "shotlist",
+      "caption"
+    ],
+    "memory_policy": {
+      "read": [
+        "winners"
+      ],
+      "write": [
+        "drafts",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "memory.recall",
+        "kb.search"
+      ],
+      "actions": [
+        "propose"
+      ]
+    },
+    "channels": {
+      "in": [
+        "creative_director",
+        "hook_writer"
+      ],
+      "out": [
+        "creative_director",
+        "motion_graphics_planner",
+        "cta_specialist"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial",
+      "to": "creative_director"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.8
+    },
+    "eval_policy": {
+      "primary": "watch_time_lift",
+      "secondary": [
+        "approval_pass_rate"
+      ]
+    }
+  },
+  {
+    "id": "story_writer",
+    "name": "Story Writer",
+    "tier": "specialist",
+    "department": "creative",
+    "reports_to": "creative_director",
+    "goal": "Write engaging story sequences with interaction.",
+    "responsibilities": [
+      "multi-frame arcs",
+      "interactive sticker intent",
+      "drive DMs/replies/visits"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "memory.recall",
+      "kb.search"
+    ],
+    "inputs": [
+      "idea",
+      "persona",
+      "brand_voice"
+    ],
+    "outputs": [
+      "story_frames",
+      "cta"
+    ],
+    "memory_policy": {
+      "read": [
+        "winners"
+      ],
+      "write": [
+        "drafts",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "memory.recall",
+        "kb.search"
+      ],
+      "actions": [
+        "propose"
+      ]
+    },
+    "channels": {
+      "in": [
+        "creative_director"
+      ],
+      "out": [
+        "creative_director",
+        "design_lead"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial",
+      "to": "creative_director"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.8
+    },
+    "eval_policy": {
+      "primary": "replies_taps_forward",
+      "secondary": [
+        "profile_visit_lift"
+      ]
+    }
+  },
+  {
+    "id": "cta_specialist",
+    "name": "CTA Specialist",
+    "tier": "specialist",
+    "department": "creative",
+    "reports_to": "creative_director",
+    "goal": "Attach the right CTA to every asset.",
+    "responsibilities": [
+      "select/write CTA by goal",
+      "A/B variants",
+      "compliance-safe phrasing"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "kb.search",
+      "memory.recall"
+    ],
+    "inputs": [
+      "asset",
+      "goal",
+      "persona"
+    ],
+    "outputs": [
+      "primary_cta",
+      "variants",
+      "placement"
+    ],
+    "memory_policy": {
+      "read": [
+        "cta_library",
+        "winners"
+      ],
+      "write": [
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "kb.search",
+        "memory.recall"
+      ],
+      "actions": [
+        "propose"
+      ]
+    },
+    "channels": {
+      "in": [
+        "carousel_writer",
+        "reel_writer",
+        "creative_director"
+      ],
+      "out": [
+        "creative_director"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "default_safe_cta",
+      "to": "creative_director"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.6
+    },
+    "eval_policy": {
+      "primary": "cta_action_lift",
+      "secondary": [
+        "link_ctr"
+      ]
+    }
+  },
+  {
+    "id": "brand_voice_manager",
+    "name": "Brand Voice Manager",
+    "tier": "specialist",
+    "department": "creative",
+    "reports_to": "creative_director",
+    "goal": "Guarantee every asset sounds like Zentrix and is compliant.",
+    "responsibilities": [
+      "own brand rules",
+      "run brand-review stage",
+      "rewrite off-voice copy",
+      "learn from operator corrections"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "kb.search",
+      "memory.recall",
+      "db.write_brand_note"
+    ],
+    "inputs": [
+      "draft",
+      "brand_guidelines",
+      "past_corrections"
+    ],
+    "outputs": [
+      "pass_fail",
+      "edited_copy",
+      "violations",
+      "brand_rule_updates"
+    ],
+    "memory_policy": {
+      "read": [
+        "brand_rules",
+        "corrections"
+      ],
+      "write": [
+        "corrections",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "kb.search",
+        "memory.recall",
+        "db.write_brand_note"
+      ],
+      "actions": [
+        "edit_copy",
+        "update_brand_notes"
+      ]
+    },
+    "channels": {
+      "in": [
+        "creative_director"
+      ],
+      "out": [
+        "creative_director",
+        "carousel_writer",
+        "reel_writer"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "flag_hitl"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.3
+    },
+    "eval_policy": {
+      "primary": "operator_override_rate",
+      "secondary": [
+        "consistency_score"
+      ]
+    }
+  },
+  {
+    "id": "design_lead",
+    "name": "Design Lead",
+    "tier": "manager",
+    "department": "design",
+    "reports_to": "ceo",
+    "goal": "Turn approved copy into on-brand visual assets ready to publish.",
+    "responsibilities": [
+      "assign design tasks",
+      "enforce design system",
+      "route through Visual QA",
+      "deliver to Publishing"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "canva.search-brand-templates",
+      "memory.recall",
+      "kb.search"
+    ],
+    "inputs": [
+      "approved_copy",
+      "design_intent",
+      "design_system"
+    ],
+    "outputs": [
+      "final_assets",
+      "qa_record"
+    ],
+    "memory_policy": {
+      "read": [
+        "design_winners",
+        "design_system"
+      ],
+      "write": [
+        "design_decisions"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "canva.search-brand-templates",
+        "memory.recall",
+        "kb.search"
+      ],
+      "actions": [
+        "dispatch"
+      ]
+    },
+    "channels": {
+      "in": [
+        "creative_director"
+      ],
+      "out": [
+        "design_specialists",
+        "publishing_lead"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "best_asset_flagged",
+      "to": "ceo"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.5
+    },
+    "eval_policy": {
+      "primary": "visual_qa_pass_rate",
+      "secondary": [
+        "rework_rate",
+        "on_brand_score"
+      ]
+    }
+  },
+  {
+    "id": "canva_designer",
+    "name": "Canva Designer",
+    "tier": "specialist",
+    "department": "design",
+    "reports_to": "design_lead",
+    "goal": "Generate/assemble designs in Canva from templates + copy.",
+    "responsibilities": [
+      "pick brand template",
+      "inject copy/assets",
+      "export",
+      "version"
+    ],
+    "tools": [
+      "canva.create-design-from-brand-template",
+      "canva.perform-editing-operations",
+      "canva.export-design",
+      "drive.upload",
+      "memory.recall"
+    ],
+    "inputs": [
+      "copy_slides",
+      "template_id",
+      "brand_kit"
+    ],
+    "outputs": [
+      "design_id",
+      "exports"
+    ],
+    "memory_policy": {
+      "read": [
+        "design_winners"
+      ],
+      "write": [
+        "design_records",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "canva.create-design-from-brand-template",
+        "canva.perform-editing-operations",
+        "canva.export-design",
+        "drive.upload",
+        "memory.recall"
+      ],
+      "actions": [
+        "create_design"
+      ]
+    },
+    "channels": {
+      "in": [
+        "design_lead"
+      ],
+      "out": [
+        "design_lead",
+        "visual_qa"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "simpler_template",
+      "to": "design_lead"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.4
+    },
+    "eval_policy": {
+      "primary": "first_pass_qa_acceptance",
+      "secondary": [
+        "time_to_asset"
+      ]
+    }
+  },
+  {
+    "id": "thumbnail_creator",
+    "name": "Thumbnail Creator",
+    "tier": "specialist",
+    "department": "design",
+    "reports_to": "design_lead",
+    "goal": "Produce high-CTR thumbnails/covers.",
+    "responsibilities": [
+      "design cover frames",
+      "legibility at small size",
+      "align to hook",
+      "1-2 variants"
+    ],
+    "tools": [
+      "canva.create-design-from-brand-template",
+      "canva.export-design",
+      "memory.recall",
+      "kb.search"
+    ],
+    "inputs": [
+      "hook",
+      "asset",
+      "brand_system"
+    ],
+    "outputs": [
+      "thumbnail_variants",
+      "rationale"
+    ],
+    "memory_policy": {
+      "read": [
+        "thumbnail_winners"
+      ],
+      "write": [
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "canva.create-design-from-brand-template",
+        "canva.export-design",
+        "memory.recall",
+        "kb.search"
+      ],
+      "actions": [
+        "create_design"
+      ]
+    },
+    "channels": {
+      "in": [
+        "design_lead"
+      ],
+      "out": [
+        "design_lead",
+        "visual_qa"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "default_cover",
+      "to": "design_lead"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.5
+    },
+    "eval_policy": {
+      "primary": "thumbnail_ctr_lift",
+      "secondary": []
+    }
+  },
+  {
+    "id": "layout_designer",
+    "name": "Layout Designer",
+    "tier": "specialist",
+    "department": "design",
+    "reports_to": "design_lead",
+    "goal": "Ensure information hierarchy & readability across slides/frames.",
+    "responsibilities": [
+      "grid/spacing/hierarchy",
+      "safe margins",
+      "set consistency"
+    ],
+    "tools": [
+      "canva.perform-editing-operations",
+      "kb.search",
+      "memory.recall"
+    ],
+    "inputs": [
+      "design_draft",
+      "design_system"
+    ],
+    "outputs": [
+      "layout_corrected_design"
+    ],
+    "memory_policy": {
+      "read": [
+        "layout_patterns"
+      ],
+      "write": [
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "canva.perform-editing-operations",
+        "kb.search",
+        "memory.recall"
+      ],
+      "actions": [
+        "edit_design"
+      ]
+    },
+    "channels": {
+      "in": [
+        "design_lead",
+        "canva_designer"
+      ],
+      "out": [
+        "visual_qa"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "flag_hitl"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.3
+    },
+    "eval_policy": {
+      "primary": "readability_score",
+      "secondary": [
+        "qa_pass_rate"
+      ]
+    }
+  },
+  {
+    "id": "visual_qa",
+    "name": "Visual QA",
+    "tier": "specialist",
+    "department": "design",
+    "reports_to": "design_lead",
+    "goal": "Block off-brand or broken visuals before approval.",
+    "responsibilities": [
+      "check palette/type/margins/legibility/spelling/aspect",
+      "pass/fail with reasons"
+    ],
+    "tools": [
+      "canva.get-design-content",
+      "vision.inspect",
+      "kb.search"
+    ],
+    "inputs": [
+      "near_final_design",
+      "design_system"
+    ],
+    "outputs": [
+      "pass_fail",
+      "annotated_issues"
+    ],
+    "memory_policy": {
+      "read": [
+        "qa_rules",
+        "past_failures"
+      ],
+      "write": [
+        "qa_records"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "canva.get-design-content",
+        "vision.inspect",
+        "kb.search"
+      ],
+      "actions": [
+        "review"
+      ]
+    },
+    "channels": {
+      "in": [
+        "design_lead",
+        "canva_designer",
+        "layout_designer",
+        "thumbnail_creator"
+      ],
+      "out": [
+        "design_lead",
+        "approval"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "fail_closed_hitl"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.1
+    },
+    "eval_policy": {
+      "primary": "escaped_defect_rate",
+      "secondary": [
+        "false_fail_rate"
+      ]
+    }
+  },
+  {
+    "id": "motion_graphics_planner",
+    "name": "Motion Graphics Planner",
+    "tier": "specialist",
+    "department": "design",
+    "reports_to": "design_lead",
+    "goal": "Plan reel motion/edit so external rendering is turnkey.",
+    "responsibilities": [
+      "edit plan: cuts/captions/transitions/b-roll/music intent",
+      "no render in v1"
+    ],
+    "tools": [
+      "openrouter.generate",
+      "kb.search",
+      "memory.recall"
+    ],
+    "inputs": [
+      "reel_script",
+      "shotlist"
+    ],
+    "outputs": [
+      "edit_plan"
+    ],
+    "memory_policy": {
+      "read": [
+        "motion_patterns"
+      ],
+      "write": [
+        "plans",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "openrouter.generate",
+        "kb.search",
+        "memory.recall"
+      ],
+      "actions": [
+        "propose"
+      ]
+    },
+    "channels": {
+      "in": [
+        "reel_writer",
+        "design_lead"
+      ],
+      "out": [
+        "design_lead",
+        "publishing_lead"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial_flagged"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.6
+    },
+    "eval_policy": {
+      "primary": "downstream_reel_performance",
+      "secondary": [
+        "plan_completeness"
+      ]
+    }
+  },
+  {
+    "id": "publishing_lead",
+    "name": "Publishing Lead",
+    "tier": "manager",
+    "department": "publishing",
+    "reports_to": "ceo",
+    "goal": "Get the right asset to the right platform at the right time, reliably.",
+    "responsibilities": [
+      "coordinate publishing specialists",
+      "enforce idempotency",
+      "own calendar"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "memory.recall",
+      "analytics.read"
+    ],
+    "inputs": [
+      "approved_assets",
+      "optimal_time_data",
+      "calendar"
+    ],
+    "outputs": [
+      "scheduled_assets",
+      "published_assets",
+      "calendar_state"
+    ],
+    "memory_policy": {
+      "read": [
+        "posting_time_winners"
+      ],
+      "write": [
+        "publishing_decisions"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "memory.recall",
+        "analytics.read"
+      ],
+      "actions": [
+        "dispatch",
+        "approve_schedule"
+      ]
+    },
+    "channels": {
+      "in": [
+        "design_lead",
+        "ceo"
+      ],
+      "out": [
+        "publishing_specialists",
+        "analytics_lead"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "hold_and_notify"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.3
+    },
+    "eval_policy": {
+      "primary": "on_time_publish_rate",
+      "secondary": [
+        "zero_double_posts",
+        "schedule_adherence"
+      ]
+    }
+  },
+  {
+    "id": "scheduler",
+    "name": "Scheduler",
+    "tier": "specialist",
+    "department": "publishing",
+    "reports_to": "publishing_lead",
+    "goal": "Assign each approved asset an optimal publish time.",
+    "responsibilities": [
+      "compute best slots",
+      "avoid collisions",
+      "respect cadence",
+      "write schedule rows"
+    ],
+    "tools": [
+      "analytics.read",
+      "db.write_schedule",
+      "memory.recall"
+    ],
+    "inputs": [
+      "approved_assets",
+      "best_time_model",
+      "calendar"
+    ],
+    "outputs": [
+      "scheduled_at_per_asset"
+    ],
+    "memory_policy": {
+      "read": [
+        "best_time_patterns"
+      ],
+      "write": [
+        "schedules"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "analytics.read",
+        "db.write_schedule",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_schedule"
+      ]
+    },
+    "channels": {
+      "in": [
+        "publishing_lead"
+      ],
+      "out": [
+        "calendar_manager",
+        "cross_platform_publisher"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "safe_historical_slot"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.2
+    },
+    "eval_policy": {
+      "primary": "posted_at_optimal_pct",
+      "secondary": [
+        "engagement_vs_predicted"
+      ]
+    }
+  },
+  {
+    "id": "cross_platform_publisher",
+    "name": "Cross-platform Publisher",
+    "tier": "specialist",
+    "department": "publishing",
+    "reports_to": "publishing_lead",
+    "goal": "Publish/queue assets per platform, idempotently.",
+    "responsibilities": [
+      "call adapters",
+      "adapt per platform",
+      "record external ids",
+      "exactly-once"
+    ],
+    "tools": [
+      "instagram.publish",
+      "platform_adapters.publish",
+      "db.write_publication",
+      "memory.recall"
+    ],
+    "inputs": [
+      "scheduled_asset",
+      "platform_targets"
+    ],
+    "outputs": [
+      "publication_records"
+    ],
+    "memory_policy": {
+      "read": [
+        "platform_quirks"
+      ],
+      "write": [
+        "publications",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "instagram.publish",
+        "platform_adapters.publish",
+        "db.write_publication",
+        "memory.recall"
+      ],
+      "actions": [
+        "publish"
+      ],
+      "requires_idempotency": true
+    },
+    "channels": {
+      "in": [
+        "scheduler",
+        "publishing_lead"
+      ],
+      "out": [
+        "analytics_lead",
+        "calendar_manager"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:4s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ],
+      "idempotent": true
+    },
+    "failure_policy": {
+      "on_exhaust": "mark_failed_hold_notify"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "publish_success_rate",
+      "secondary": [
+        "zero_duplicates"
+      ]
+    }
+  },
+  {
+    "id": "calendar_manager",
+    "name": "Calendar Manager",
+    "tier": "specialist",
+    "department": "publishing",
+    "reports_to": "publishing_lead",
+    "goal": "Maintain an accurate content calendar.",
+    "responsibilities": [
+      "reconcile schedule vs publications",
+      "surface gaps/overlaps",
+      "keep calendar in sync"
+    ],
+    "tools": [
+      "db.read_calendar",
+      "db.write_calendar",
+      "memory.recall"
+    ],
+    "inputs": [
+      "schedules",
+      "publications",
+      "cadence_rules"
+    ],
+    "outputs": [
+      "calendar_state",
+      "gap_alerts"
+    ],
+    "memory_policy": {
+      "read": [
+        "cadence_norms"
+      ],
+      "write": [
+        "calendar_events"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "db.read_calendar",
+        "db.write_calendar",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_calendar"
+      ]
+    },
+    "channels": {
+      "in": [
+        "scheduler",
+        "cross_platform_publisher"
+      ],
+      "out": [
+        "publishing_lead",
+        "notification_manager"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "flag_hitl"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.1
+    },
+    "eval_policy": {
+      "primary": "calendar_accuracy",
+      "secondary": [
+        "gap_frequency"
+      ]
+    }
+  },
+  {
+    "id": "automation_manager",
+    "name": "Automation Manager",
+    "tier": "specialist",
+    "department": "publishing",
+    "reports_to": "publishing_lead",
+    "goal": "Own recurring automations and ensure jobs fire/retry/alert.",
+    "responsibilities": [
+      "manage cron/queue triggers",
+      "ensure retries+alerts",
+      "coordinate with Ops"
+    ],
+    "tools": [
+      "scheduler.cron",
+      "queue.enqueue",
+      "memory.recall"
+    ],
+    "inputs": [
+      "automation_config",
+      "run_outcomes"
+    ],
+    "outputs": [
+      "scheduled_jobs",
+      "health_signals"
+    ],
+    "memory_policy": {
+      "read": [
+        "automation_history"
+      ],
+      "write": [
+        "job_records"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "scheduler.cron",
+        "queue.enqueue",
+        "memory.recall"
+      ],
+      "actions": [
+        "manage_jobs"
+      ]
+    },
+    "channels": {
+      "in": [
+        "publishing_lead",
+        "ops_lead"
+      ],
+      "out": [
+        "system_health",
+        "notification_manager"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "dead_letter_alert"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "job_success_rate",
+      "secondary": [
+        "missed_trigger_count"
+      ]
+    }
+  },
+  {
+    "id": "analytics_lead",
+    "name": "Analytics Lead",
+    "tier": "manager",
+    "department": "analytics",
+    "reports_to": "ceo",
+    "goal": "Convert raw metrics into prescriptive guidance.",
+    "responsibilities": [
+      "direct analytics specialists",
+      "own weekly report",
+      "feed recommendations to Strategy/Creative",
+      "guard data quality"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "analytics.read",
+      "db.read",
+      "memory.recall"
+    ],
+    "inputs": [
+      "collected_metrics",
+      "content_metadata"
+    ],
+    "outputs": [
+      "weekly_report",
+      "recommendations",
+      "kpi_data"
+    ],
+    "memory_policy": {
+      "read": [
+        "analytics_history"
+      ],
+      "write": [
+        "reports",
+        "recommendations"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "analytics.read",
+        "db.read",
+        "memory.recall"
+      ],
+      "actions": [
+        "dispatch",
+        "write_reports"
+      ]
+    },
+    "channels": {
+      "in": [
+        "publishing_lead",
+        "ceo"
+      ],
+      "out": [
+        "cso",
+        "creative_director",
+        "ceo",
+        "operator"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial_report_flagged"
+    },
+    "model_policy": {
+      "tier": "high",
+      "route": "openrouter/anthropic/claude-opus",
+      "temperature": 0.4
+    },
+    "eval_policy": {
+      "primary": "recommendation_realized_lift",
+      "secondary": [
+        "report_timeliness"
+      ]
+    }
+  },
+  {
+    "id": "instagram_analyst",
+    "name": "Instagram Analyst",
+    "tier": "specialist",
+    "department": "analytics",
+    "reports_to": "analytics_lead",
+    "goal": "Collect and normalise Instagram metrics per asset.",
+    "responsibilities": [
+      "pull insights",
+      "normalise",
+      "store time-series"
+    ],
+    "tools": [
+      "instagram.insights",
+      "db.write_metrics",
+      "memory.recall"
+    ],
+    "inputs": [
+      "published_asset_ids",
+      "metric_windows"
+    ],
+    "outputs": [
+      "normalized_metrics"
+    ],
+    "memory_policy": {
+      "read": [
+        "metric_norms"
+      ],
+      "write": [
+        "metrics",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "instagram.insights",
+        "db.write_metrics",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_metrics"
+      ]
+    },
+    "channels": {
+      "in": [
+        "publishing_lead",
+        "analytics_lead"
+      ],
+      "out": [
+        "engagement_analyst",
+        "content_scorer"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:4s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "backfill_later_flag_gaps"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "collection_completeness",
+      "secondary": [
+        "freshness"
+      ]
+    }
+  },
+  {
+    "id": "engagement_analyst",
+    "name": "Engagement Analyst",
+    "tier": "specialist",
+    "department": "analytics",
+    "reports_to": "analytics_lead",
+    "goal": "Explain why engagement happened.",
+    "responsibilities": [
+      "analyse comments/saves/shares",
+      "sentiment & themes",
+      "feed audience signals"
+    ],
+    "tools": [
+      "instagram.comments",
+      "openrouter.generate",
+      "db.write",
+      "memory.recall"
+    ],
+    "inputs": [
+      "metrics",
+      "comments"
+    ],
+    "outputs": [
+      "engagement_insights",
+      "sentiment",
+      "audience_signals"
+    ],
+    "memory_policy": {
+      "read": [
+        "reactions"
+      ],
+      "write": [
+        "insights",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "instagram.comments",
+        "openrouter.generate",
+        "db.write",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_insights"
+      ]
+    },
+    "channels": {
+      "in": [
+        "instagram_analyst"
+      ],
+      "out": [
+        "audience_researcher",
+        "content_scorer"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "partial_flagged"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.3
+    },
+    "eval_policy": {
+      "primary": "signal_usefulness",
+      "secondary": [
+        "sentiment_accuracy"
+      ]
+    }
+  },
+  {
+    "id": "content_scorer",
+    "name": "Content Scorer",
+    "tier": "specialist",
+    "department": "analytics",
+    "reports_to": "analytics_lead",
+    "goal": "Assign each asset a normalized performance score.",
+    "responsibilities": [
+      "composite score vs baseline",
+      "tag winners/losers",
+      "store scores"
+    ],
+    "tools": [
+      "db.read_scores",
+      "db.write_scores",
+      "memory.recall"
+    ],
+    "inputs": [
+      "normalized_metrics",
+      "asset_metadata"
+    ],
+    "outputs": [
+      "scores",
+      "win_loss_tags"
+    ],
+    "memory_policy": {
+      "read": [
+        "scoring_model"
+      ],
+      "write": [
+        "scores"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "db.read_scores",
+        "db.write_scores",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_scores"
+      ]
+    },
+    "channels": {
+      "in": [
+        "instagram_analyst",
+        "engagement_analyst"
+      ],
+      "out": [
+        "recommendation_engine",
+        "growth_predictor"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "flag_insufficient_sample"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "score_future_correlation",
+      "secondary": []
+    }
+  },
+  {
+    "id": "recommendation_engine",
+    "name": "Recommendation Engine",
+    "tier": "specialist",
+    "department": "analytics",
+    "reports_to": "analytics_lead",
+    "goal": "Turn winning patterns into concrete next-content recommendations.",
+    "responsibilities": [
+      "cluster multi-dimension",
+      "mine winning patterns above confidence",
+      "emit ranked recommendations"
+    ],
+    "tools": [
+      "analytics.cluster",
+      "db.read",
+      "db.write_recommendations",
+      "memory.recall"
+    ],
+    "inputs": [
+      "scored_assets",
+      "clusters"
+    ],
+    "outputs": [
+      "ranked_recommendations"
+    ],
+    "memory_policy": {
+      "read": [
+        "pattern_history"
+      ],
+      "write": [
+        "recommendations",
+        "episodes"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "analytics.cluster",
+        "db.read",
+        "db.write_recommendations",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_recommendations"
+      ]
+    },
+    "channels": {
+      "in": [
+        "content_scorer"
+      ],
+      "out": [
+        "cso",
+        "creative_director",
+        "ceo"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "withhold_low_confidence"
+    },
+    "model_policy": {
+      "tier": "high",
+      "route": "openrouter/anthropic/claude-opus",
+      "temperature": 0.3
+    },
+    "eval_policy": {
+      "primary": "adopted_recommendation_lift",
+      "secondary": []
+    }
+  },
+  {
+    "id": "growth_predictor",
+    "name": "Growth Predictor",
+    "tier": "specialist",
+    "department": "analytics",
+    "reports_to": "analytics_lead",
+    "goal": "Forecast reach/follower trajectory and flag risks.",
+    "responsibilities": [
+      "model growth trends",
+      "project content-mix impact",
+      "anomaly alerts"
+    ],
+    "tools": [
+      "analytics.read",
+      "db.write_forecast",
+      "memory.recall"
+    ],
+    "inputs": [
+      "historical_timeseries",
+      "planned_calendar"
+    ],
+    "outputs": [
+      "forecasts",
+      "anomaly_alerts"
+    ],
+    "memory_policy": {
+      "read": [
+        "history"
+      ],
+      "write": [
+        "forecasts"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "analytics.read",
+        "db.write_forecast",
+        "memory.recall"
+      ],
+      "actions": [
+        "write_forecast"
+      ]
+    },
+    "channels": {
+      "in": [
+        "content_scorer",
+        "analytics_lead"
+      ],
+      "out": [
+        "ceo",
+        "cso",
+        "notification_manager"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "widen_bands_abstain"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.2
+    },
+    "eval_policy": {
+      "primary": "forecast_mape",
+      "secondary": [
+        "anomaly_precision_recall"
+      ]
+    }
+  },
+  {
+    "id": "ops_lead",
+    "name": "Ops Lead",
+    "tier": "manager",
+    "department": "operations",
+    "reports_to": "ceo",
+    "goal": "Keep COS healthy, observable, and within budget.",
+    "responsibilities": [
+      "oversee ops agents",
+      "own runbooks",
+      "manage budgets & alerts",
+      "incident response"
+    ],
+    "tools": [
+      "orchestrator.dispatch",
+      "db.admin_read",
+      "metrics.read",
+      "notify.operator"
+    ],
+    "inputs": [
+      "system_metrics",
+      "health_signals",
+      "budgets"
+    ],
+    "outputs": [
+      "health_status",
+      "incident_actions",
+      "budget_reports"
+    ],
+    "memory_policy": {
+      "read": [
+        "ops_history"
+      ],
+      "write": [
+        "incident_records"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "orchestrator.dispatch",
+        "db.admin_read",
+        "metrics.read",
+        "notify.operator"
+      ],
+      "actions": [
+        "dispatch",
+        "remediate_safe",
+        "escalate"
+      ]
+    },
+    "channels": {
+      "in": [
+        "ops_agents",
+        "ceo"
+      ],
+      "out": [
+        "operator",
+        "departments"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "page_operator"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.2
+    },
+    "eval_policy": {
+      "primary": "uptime",
+      "secondary": [
+        "mttr",
+        "budget_adherence"
+      ]
+    }
+  },
+  {
+    "id": "database_manager",
+    "name": "Database Manager",
+    "tier": "specialist",
+    "department": "operations",
+    "reports_to": "ops_lead",
+    "goal": "Keep data correct, migrated, and performant.",
+    "responsibilities": [
+      "apply migrations via CI",
+      "monitor slow queries",
+      "retention/archival",
+      "ensure backups"
+    ],
+    "tools": [
+      "db.admin",
+      "metrics.read"
+    ],
+    "inputs": [
+      "migration_set",
+      "query_metrics"
+    ],
+    "outputs": [
+      "migration_status",
+      "health",
+      "retention_actions"
+    ],
+    "memory_policy": {
+      "read": [
+        "schema_history"
+      ],
+      "write": [
+        "ops_records"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "db.admin",
+        "metrics.read"
+      ],
+      "actions": [
+        "migrate_via_ci"
+      ]
+    },
+    "channels": {
+      "in": [
+        "ops_lead"
+      ],
+      "out": [
+        "ops_lead",
+        "system_health"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 1,
+      "backoff": "none",
+      "retryable": []
+    },
+    "failure_policy": {
+      "on_exhaust": "rollback_alert"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "migration_success",
+      "secondary": [
+        "query_p95",
+        "backup_freshness"
+      ]
+    }
+  },
+  {
+    "id": "memory_manager",
+    "name": "Memory Manager",
+    "tier": "specialist",
+    "department": "operations",
+    "reports_to": "ops_lead",
+    "goal": "Keep memory fresh, deduped, and retrievable.",
+    "responsibilities": [
+      "embedding backfills",
+      "dedupe/compact episodes",
+      "summarise old memory",
+      "index health"
+    ],
+    "tools": [
+      "memory.admin",
+      "embeddings.batch",
+      "db.admin_read"
+    ],
+    "inputs": [
+      "memory_tables",
+      "index_stats"
+    ],
+    "outputs": [
+      "compacted_memory",
+      "index_maintenance"
+    ],
+    "memory_policy": {
+      "read": [
+        "*"
+      ],
+      "write": [
+        "semantic",
+        "archive"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "memory.admin",
+        "embeddings.batch",
+        "db.admin_read"
+      ],
+      "actions": [
+        "compact",
+        "summarise",
+        "reembed"
+      ]
+    },
+    "channels": {
+      "in": [
+        "ops_lead"
+      ],
+      "out": [
+        "ops_lead"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "skip_alert"
+    },
+    "model_policy": {
+      "tier": "mid",
+      "route": "openrouter/anthropic/claude-sonnet",
+      "temperature": 0.2
+    },
+    "eval_policy": {
+      "primary": "recall_hit_rate",
+      "secondary": [
+        "index_latency",
+        "storage_growth"
+      ]
+    }
+  },
+  {
+    "id": "notification_manager",
+    "name": "Notification Manager",
+    "tier": "specialist",
+    "department": "operations",
+    "reports_to": "ops_lead",
+    "goal": "Deliver the right notifications to the right channel without noise.",
+    "responsibilities": [
+      "route notifications",
+      "batch/dedupe",
+      "respect quiet hours & severity"
+    ],
+    "tools": [
+      "slack.send",
+      "discord.send",
+      "resend.send",
+      "db.write_notification"
+    ],
+    "inputs": [
+      "events"
+    ],
+    "outputs": [
+      "delivered_notifications",
+      "in_app_records"
+    ],
+    "memory_policy": {
+      "read": [
+        "notification_prefs"
+      ],
+      "write": [
+        "delivery_log"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "slack.send",
+        "discord.send",
+        "resend.send",
+        "db.write_notification"
+      ],
+      "actions": [
+        "send"
+      ],
+      "requires_idempotency": true
+    },
+    "channels": {
+      "in": [
+        "*"
+      ],
+      "out": [
+        "operator_channels"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 3,
+      "backoff": "exp:2s",
+      "retryable": [
+        "tool_timeout",
+        "rate_limit",
+        "5xx"
+      ]
+    },
+    "failure_policy": {
+      "on_exhaust": "fallback_in_app"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0.1
+    },
+    "eval_policy": {
+      "primary": "delivery_success",
+      "secondary": [
+        "noise_complaints",
+        "time_to_notify_critical"
+      ]
+    }
+  },
+  {
+    "id": "tool_manager",
+    "name": "Tool Manager",
+    "tier": "specialist",
+    "department": "operations",
+    "reports_to": "ops_lead",
+    "goal": "Keep external tools connected, authorised, and within limits.",
+    "responsibilities": [
+      "health-check tools",
+      "refresh/rotate creds via vault",
+      "monitor rate limits",
+      "open breakers",
+      "expose status"
+    ],
+    "tools": [
+      "tools.healthcheck",
+      "secrets.status",
+      "metrics.read"
+    ],
+    "inputs": [
+      "tool_configs",
+      "error_rates"
+    ],
+    "outputs": [
+      "tool_status_matrix",
+      "breaker_states",
+      "alerts"
+    ],
+    "memory_policy": {
+      "read": [
+        "tool_history"
+      ],
+      "write": [
+        "status",
+        "incidents"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "tools.healthcheck",
+        "secrets.status",
+        "metrics.read"
+      ],
+      "actions": [
+        "toggle_breaker",
+        "read_secret_status"
+      ]
+    },
+    "channels": {
+      "in": [
+        "*",
+        "ops_lead"
+      ],
+      "out": [
+        "ops_lead",
+        "system_health",
+        "ui"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 0,
+      "backoff": "none",
+      "retryable": []
+    },
+    "failure_policy": {
+      "on_exhaust": "breaker_open_degrade_alert"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "tool_uptime",
+      "secondary": [
+        "mttd_outages"
+      ]
+    }
+  },
+  {
+    "id": "system_health",
+    "name": "System Health",
+    "tier": "specialist",
+    "department": "operations",
+    "reports_to": "ops_lead",
+    "goal": "Provide a single truthful view of system health.",
+    "responsibilities": [
+      "aggregate queue/run/tool/budget/error metrics",
+      "compute IG & overall health",
+      "drive alerts"
+    ],
+    "tools": [
+      "metrics.read",
+      "db.read",
+      "notify.operator"
+    ],
+    "inputs": [
+      "all_subsystem_metrics"
+    ],
+    "outputs": [
+      "health_rollups",
+      "alerts",
+      "incident_timelines"
+    ],
+    "memory_policy": {
+      "read": [
+        "incident_history"
+      ],
+      "write": [
+        "health_snapshots"
+      ]
+    },
+    "permissions": {
+      "tools": [
+        "metrics.read",
+        "db.read",
+        "notify.operator"
+      ],
+      "actions": [
+        "alert"
+      ]
+    },
+    "channels": {
+      "in": [
+        "ops_agents"
+      ],
+      "out": [
+        "operator",
+        "ceo"
+      ]
+    },
+    "retry_policy": {
+      "max_attempts": 0,
+      "backoff": "none",
+      "retryable": []
+    },
+    "failure_policy": {
+      "on_exhaust": "self_report_degraded"
+    },
+    "model_policy": {
+      "tier": "cheap",
+      "route": "openrouter/anthropic/claude-haiku",
+      "temperature": 0
+    },
+    "eval_policy": {
+      "primary": "alert_precision_recall",
+      "secondary": [
+        "dashboard_accuracy"
+      ]
+    }
+  }
+]

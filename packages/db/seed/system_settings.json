@@ -1,0 +1,24 @@
+{
+  "budget.daily_usd": 25,
+  "autoapprove.policy": {
+    "enabled": false,
+    "min_confidence": 0.85,
+    "formats": [],
+    "note": "Human-by-exception (doc 01 §6). Auto-approve is opt-in per format above a confidence floor."
+  },
+  "confidence.thresholds": {
+    "recommendation_min": 0.7,
+    "auto_publish_min": 0.85,
+    "escalate_below": 0.5
+  },
+  "timezone": "UTC",
+  "niche.keywords": [],
+  "sources.config": {
+    "reddit": { "enabled": true, "subreddits": [] },
+    "youtube": { "enabled": true },
+    "web": { "enabled": true },
+    "exa": { "enabled": true }
+  },
+  "retention.metrics_days": 400,
+  "retention.tool_calls_days": 90
+}
