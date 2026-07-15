@@ -11,6 +11,7 @@
     "enqueue:carousel": "tsx src/enqueue-carousel.ts",
     "enqueue:resume": "tsx src/enqueue-resume.ts",
     "enqueue:learn": "tsx src/enqueue-learn.ts",
+    "enqueue:daily": "tsx src/enqueue-daily.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

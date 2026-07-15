@@ -30,13 +30,13 @@ export const hookSchema = z.object({
   ...base,
 });
 export const outlineSchema = z.object({
-  slides: z.array(z.object({ n: z.number().int(), point: z.string() })).min(3),
+  slides: z.array(z.object({ n: z.number().int(), point: z.string() })).min(1),
   ...base,
 });
 export const draftSchema = z.object({
   slides: z
     .array(z.object({ n: z.number().int(), text: z.string(), design_intent: z.string() }))
-    .min(3),
+    .min(1),
   caption: z.string(),
   ...base,
 });

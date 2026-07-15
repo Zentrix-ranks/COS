@@ -164,6 +164,41 @@ the Analytics tab and influence the next ideation run; memory recall demonstrabl
 - `measure_recommendations` (realized_lift) to close the self-correction loop (doc 13 §7.1).
 - Weekly report composition + delivery (doc 13 §9); scheduled analytics jobs via cron (doc 14, M4).
 
+## M4 — Full org & daily automation (in progress)
+
+Target (spec/16 §6 M4): remaining departments/agents, all formats, agent communication protocol
+(doc 10), notifications (doc 03 §11.4), and the daily automation loop + cron + queues (doc 14).
+
+### What this slice delivers
+
+| Area | Deliverable | Spec trace | Status |
+|------|-------------|-----------|--------|
+| Daily loop | `runDailyLoop` (ceo graph): strategy → ideation → bounded fan-out → approve-by-exception → publish+measure (auto) → learn → weekly report → CEO summary | doc 06 §5.1, doc 14 §2 | ✅ done |
+| All formats | pipeline generalized to reel/story/image/carousel (`startPipeline`, per-format unit counts) | doc 12 §6 | ✅ done |
+| Approve-by-exception | auto-approve policy (enabled + eligible format + confidence gate) in the engine; else HITL | doc 12 §4.13, doc 14 §11 | ✅ done |
+| Agent comms | `messages` table (SC-03) + `sendMessage`/`delegate` with channel-permission routing and delegation → tasks | doc 10 §3/§5/§6 | ✅ done |
+| Notifications | Notification Manager `notify`: durable in-app + mock external channels, severity | doc 03 §11.4, doc 04 §11 | ✅ done |
+| Weekly report | `composeWeeklyReport`: KPIs, top assets, recs, forecast → `weekly_reports` + delivered | doc 13 §9 | ✅ done |
+| Cron | repeatable BullMQ jobs (daily.kickoff, analytics.learn, weekly_report) with stable jobIds | doc 14 §3/§4 | ✅ done |
+
+### Verified locally (full loop, ephemeral Postgres + Redis + worker)
+
+With auto-approve enabled for story+image (operator config), one `daily.kickoff` ran the loop
+unattended: 4 content ideas across all formats → 4 pipeline runs; **story + image auto-published**
+(2 publications + metrics) while **carousel + reel paused for approval** (2 pending) — operator
+approves by exception. 2 agent messages (ceo→cso, ceo→creative_director) + delegated tasks were
+recorded; notifications fired (approvals digest, weekly-report, daily summary); the **weekly
+report was composed and delivered** (in_app+slack) with grounded KPIs; cron repeatables were
+registered (6 keys in Redis). **Meets the M4 DoD.**
+
+### Remaining M4 items
+
+- Full per-agent department subgraphs and per-format prompt sets (structural support + shared
+  Creative prompts for now); real per-format stage tuning (reel beat-sheet, story fast-track).
+- `publish.tick` fire-at-slot cron + per-tool token buckets (doc 14 §4.1/§6); kill-switch +
+  quiet hours (doc 14 §8); DLQ + missed-cron catch-up (doc 14 §10) — hardened in M5.
+- Operations/Automation dashboard tabs + Settings → Automation (doc 07 §9).
+
 ## Implementation decisions
 
 ### ID-01 — Lightweight graph engine vs the LangGraph library
@@ -190,6 +225,13 @@ specialists → 36 agents** (verified: seed loads 1 executive + 6 managers + 29 
 Recommend correcting doc 03 §2 to "29 specialists = 36 agents" and updating the "35 agent
 seed rows" phrasing in doc 04 §15 and doc 16 §6 (M0) to 36. The seed loads all 36 from A2
 (the canonical source) rather than dropping one to match the stale total.
+
+### SC-03 — `messages` table has no DDL in doc 04
+
+doc 04's entity map (§2) lists `messages (agent comms, doc 10)`, but no `create table messages`
+appears in §4–§11. Migration `0014_messages.sql` supplies it, matching the doc 10 §3 envelope
+(correlation/causation ids, type, from/to, subject, payload, confidence, priority, hop,
+deadline, task_id, delivery status). Recommend adding this table's DDL to doc 04.
 
 ### SC-02 — `window` is a reserved word (metrics, clusters)
 

@@ -28,6 +28,8 @@ export const JOBS = {
   pipelineResume: 'pipeline.resume',
   /** M3: run the learning loop — score → cluster → recommend → forecast → promote (doc 13). */
   learn: 'analytics.learn',
+  /** M4: compose + deliver the weekly report (doc 13 §9). */
+  weeklyReport: 'analytics.weekly_report',
 } as const;
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];

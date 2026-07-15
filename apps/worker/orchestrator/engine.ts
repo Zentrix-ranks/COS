@@ -34,6 +34,17 @@ async function setAssetStatus(ctx: ExecCtx, assetId: string, status: string): Pr
   await ctx.db.query(`update assets set status=$1, updated_at=now() where id=$2`, [status, assetId]);
 }
 
+/** Auto-approve policy (doc 12 §4.13, doc 14 §11): enabled + eligible format + confidence gate. */
+async function shouldAutoApprove(ctx: ExecCtx, format: string, confidence: number): Promise<boolean> {
+  const { rows } = await ctx.db.query<{ value: { enabled?: boolean; min_confidence?: number; formats?: string[] } }>(
+    `select value from system_settings where key='autoapprove.policy'`,
+  );
+  const policy = rows[0]?.value;
+  if (!policy?.enabled) return false;
+  if (!(policy.formats ?? []).includes(format)) return false;
+  return confidence >= (policy.min_confidence ?? 0.85);
+}
+
 /**
  * Drive the carousel pipeline from `state.node`. Returns when the run pauses at HITL approval
  * or completes. Safe to call again on resume (with state.decision set) — it re-enters at the
@@ -54,21 +65,33 @@ export async function runPipeline(ctx: ExecCtx, state: PipelineState): Promise<P
     // ---- Approval node: interrupt on first arrival, route on resume (doc 06 §6, doc 12 §4.13).
     if (node === 'approval') {
       if (!state.decision) {
-        // Auto-approve is opt-in per type above a confidence floor (doc 12 §4.13). Disabled by
-        // default (system_settings 'autoapprove.policy'), so M1 always interrupts for a human.
-        state.node = 'approval';
-        state.needsApproval = true;
-        await setAssetStatus(ctx, state.assetId, 'in_review');
-        const { rows } = await ctx.db.query<{ id: string }>(
-          `insert into approvals (asset_id, requested_by, status) values ($1,'creative_director','pending') returning id`,
-          [state.assetId],
-        );
-        await ctx.db.query(`update runs set status='paused', current_node='approval', checkpoint=$1, updated_at=now() where id=$2`, [
-          JSON.stringify(state),
-          ctx.runId,
-        ]);
-        ctx.publish({ node: 'approval', agentId: 'operator', status: 'paused', verb: 'awaiting approval' });
-        return { status: 'paused', approvalId: rows[0]!.id };
+        // Auto-approve is opt-in per type above a confidence floor (doc 12 §4.13, doc 14 §11):
+        // if enabled, high-confidence eligible formats auto-pass; everything else interrupts
+        // for a human — this is "operator approves by exception".
+        if (await shouldAutoApprove(ctx, state.format, state.confidence)) {
+          await ctx.db.query(
+            `insert into approvals (asset_id, requested_by, status, note, decided_at)
+             values ($1,'creative_director','approved','auto-approved (confidence ≥ threshold)', now())`,
+            [state.assetId],
+          );
+          ctx.publish({ node: 'approval', agentId: 'system', status: 'auto_approved' });
+          state.decision = 'approved';
+          // fall through to the approved handling below
+        } else {
+          state.node = 'approval';
+          state.needsApproval = true;
+          await setAssetStatus(ctx, state.assetId, 'in_review');
+          const { rows } = await ctx.db.query<{ id: string }>(
+            `insert into approvals (asset_id, requested_by, status) values ($1,'creative_director','pending') returning id`,
+            [state.assetId],
+          );
+          await ctx.db.query(`update runs set status='paused', current_node='approval', checkpoint=$1, updated_at=now() where id=$2`, [
+            JSON.stringify(state),
+            ctx.runId,
+          ]);
+          ctx.publish({ node: 'approval', agentId: 'operator', status: 'paused', verb: 'awaiting approval' });
+          return { status: 'paused', approvalId: rows[0]!.id };
+        }
       }
       // Resume with a decision (doc 12 §4.13 On fail routing).
       if (state.decision === 'approved') {

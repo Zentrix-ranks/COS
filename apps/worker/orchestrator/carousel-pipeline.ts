@@ -9,7 +9,6 @@ import { type ExecCtx, runStage, type StageSpec } from '../agents/executor.js';
 import { publishOnce } from '../publishing/publisher.js';
 import { collectMetrics } from '../analytics/collect.js';
 
-const SLIDES = 7;
 const DEFAULT_PERSONA = {
   name: 'Aspiring prop-firm trader',
   pains: ['blows funded accounts', 'no consistent edge', 'overtrades'],
@@ -23,7 +22,7 @@ function baseCtx(state: PipelineState): PromptContext {
     format: state.format,
     persona: DEFAULT_PERSONA,
     brandVoiceSummary: DEFAULT_BRAND_VOICE,
-    slides: SLIDES,
+    slides: Math.max(1, state.budget.units), // frames/slides/scenes per format (doc 12 §6)
     asset: state.asset,
   };
 }

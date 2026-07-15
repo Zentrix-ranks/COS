@@ -44,7 +44,7 @@ export interface PipelineState {
   decision?: ApprovalDecision; // injected on resume after HITL
   operatorNote?: string;
   memoryUsed: string[]; // recall summaries injected, for the Run Inspector (doc 05 §9)
-  budget: { steps: number };
+  budget: { steps: number; units: number }; // units = target slides/frames/scenes per format
   correlationId: string;
 }
 
