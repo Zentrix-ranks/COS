@@ -37,8 +37,18 @@ and makes the resulting codebase far more maintainable.
 ```
 .                                   ← COS repository root
 ├── README.md                       ← you are here
+├── apps/
+│   ├── web/                        ← Next.js control plane (Mission Control) — doc 02 §11
+│   └── worker/                     ← agent runtime (BullMQ worker, no-op agent) — doc 02 §3.2
+├── packages/
+│   ├── db/                         ← schema, migrations, seed (36 agents) — doc 04
+│   ├── shared/                     ← enums, message envelope, queue names — doc 04/10
+│   ├── prompts/                    ← prompt library (doc 09) — to come
+│   └── knowledge/                  ← KB loaders/embedders (doc 11) — to come
+├── infra/                          ← IaC / deploy config (doc 15) — to come
 ├── docs/
-│   └── 00-origin-conversation.md   ← the founding conversation + the "extra step"
+│   ├── 00-origin-conversation.md   ← the founding conversation + the "extra step"
+│   └── 01-implementation-notes.md  ← build progress + spec corrections discovered
 └── spec/
     ├── 00-index.md                 ← master index + page-count map
     ├── 01-vision-and-prd.md
@@ -102,6 +112,23 @@ The Zentrix repository no longer carries the COS blueprint.
 Implementation now proceeds here, incrementally against the spec, milestone by
 milestone (M0 → M5, per `spec/01-vision-and-prd.md` §12 and `spec/16-claude-code-master-build-prompt.md`).
 See `spec/00-index.md` for the document map and conventions.
+
+**Current milestone: M0 — Foundations (in progress).** The monorepo scaffold, the full
+database schema + migrations, the 36-agent seed, shared types, a Mission Control shell, and a
+no-op agent worker are in place; migrations + seed are verified end-to-end on Postgres +
+pgvector. See `docs/01-implementation-notes.md` for exactly what is done, what remains to reach
+the M0 Definition of Done, and the spec corrections discovered along the way.
+
+### Quick start (developer)
+
+```bash
+npm install
+npm run typecheck                       # all packages
+psql "$DATABASE_URL" -f packages/db/local-dev-shim.sql   # plain-Postgres dev only (not Supabase)
+npm run db:migrate && npm run db:seed   # needs a Postgres with pgvector; see packages/db/README.md
+npm run dev:web                         # Mission Control at http://localhost:3000
+npm run dev:worker                      # agent runtime (needs Redis)
+```
 
 ---
 

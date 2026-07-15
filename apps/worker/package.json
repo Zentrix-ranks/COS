@@ -1,0 +1,26 @@
+{
+  "name": "@cos/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "enqueue:noop": "tsx src/enqueue-noop.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cos/db": "*",
+    "@cos/shared": "*",
+    "bullmq": "^5.12.0",
+    "ioredis": "5.10.1",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

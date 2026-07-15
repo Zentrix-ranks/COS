@@ -1,0 +1,23 @@
+{
+  "name": "cos",
+  "version": "0.0.0",
+  "private": true,
+  "description": "COS — Content Operating System for Zentrix (monorepo). See spec/ for the blueprint.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run migrate -w @cos/db",
+    "db:seed": "npm run seed -w @cos/db",
+    "dev:web": "npm run dev -w @cos/web",
+    "dev:worker": "npm run dev -w @cos/worker"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "ioredis": "5.10.1"
+  }
+}
