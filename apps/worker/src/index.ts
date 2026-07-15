@@ -13,6 +13,9 @@ import { getPublisherAdapter } from '../tools/instagram.js';
 import { runLearning } from '../analytics/learning.js';
 import { composeWeeklyReport } from '../analytics/weekly.js';
 import { runDailyLoop } from '../orchestrator/daily-loop.js';
+import { computeAndWriteHealth } from '../ops/health.js';
+import { isOperationPaused } from '../ops/governance.js';
+import { notify } from '../notify/notify.js';
 import { type PipelineDeps, resumeCarousel, startCarousel } from '../orchestrator/carousel-run.js';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
@@ -28,9 +31,19 @@ const publish: PipelineDeps['publish'] = (evt) => {
 };
 const deps: PipelineDeps = { db, provider, tools, publish };
 
+// Queue handle for enqueue/cron and for reading queue depth in the healthcheck job.
+const cronQueue = new Queue(QUEUES.runs, { connection });
+
 const worker = new Worker(
   QUEUES.runs,
   async (job) => {
+    // Kill-switch (doc 14 §8): when paused, generation jobs short-circuit; in-flight runs
+    // hold at their checkpoint (enforced in the engine). Health/observability still runs.
+    const GENERATION_JOBS: string[] = [JOBS.dailyKickoff, JOBS.pipelineCarousel];
+    if (GENERATION_JOBS.includes(job.name) && (await isOperationPaused(db))) {
+      console.log(`[worker] ${job.name} short-circuited: operation paused`);
+      return { skipped: 'operation_paused' };
+    }
     switch (job.name) {
       case JOBS.noop: {
         const taskId = (job.data as { taskId?: string } | undefined)?.taskId;
@@ -61,6 +74,12 @@ const worker = new Worker(
         console.log('[worker] weekly report', res.reportId);
         return res;
       }
+      case JOBS.healthcheck: {
+        const counts = await cronQueue.getJobCounts('waiting', 'active', 'delayed');
+        const depth = (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+        const snap = await computeAndWriteHealth(db, depth);
+        return snap;
+      }
       default:
         throw new Error(`Unknown job on ${QUEUES.runs}: ${job.name}`);
     }
@@ -72,19 +91,37 @@ worker.on('completed', (job, result) => {
   console.log(`[worker] ${job.name} completed`, result);
 });
 worker.on('failed', (job, err) => {
-  console.error(`[worker] ${job?.name} failed:`, err.message);
+  const attempts = job?.opts.attempts ?? 1;
+  const made = job?.attemptsMade ?? 0;
+  console.error(`[worker] ${job?.name} failed (attempt ${made}/${attempts}):`, err.message);
+  // Dead-letter (doc 06 §7, doc 14 §4): on exhausted retries, alert + audit the poison job.
+  if (job && made >= attempts) {
+    void notify(db, {
+      severity: 'critical',
+      title: `Job dead-lettered: ${job.name}`,
+      body: `Exhausted ${attempts} attempt(s): ${err.message}`,
+      channels: ['in_app', 'slack'],
+      data: { jobId: job.id, name: job.name },
+    }).catch(() => undefined);
+    void db
+      .query(`insert into audit_log (actor_type, actor_id, action, target, meta) values ('system','worker','dlq',$1,$2)`, [
+        job.name,
+        JSON.stringify({ jobId: job.id, error: err.message, attempts }),
+      ])
+      .catch(() => undefined);
+  }
 });
 
 console.log(`[worker] listening on queue '${QUEUES.runs}' (redis: ${redisUrl}, model: ${provider.name})`);
 
 // Register cron (repeatable BullMQ jobs) — the daily automation schedule (doc 14 §3).
 // Repeatable jobs use stable jobIds so duplicates don't stack and survive restarts (§4).
-const cronQueue = new Queue(QUEUES.runs, { connection });
 async function registerCron(): Promise<void> {
   const entries: Array<{ name: string; cron: string }> = [
     { name: JOBS.dailyKickoff, cron: '0 6 * * *' }, // daily kickoff (operator tz)
     { name: JOBS.learn, cron: '30 5 * * *' }, // recluster + patterns + recommendations
     { name: JOBS.weeklyReport, cron: '0 9 * * 1' }, // Monday weekly report
+    { name: JOBS.healthcheck, cron: '*/5 * * * *' }, // tools/queues/budgets health
   ];
   for (const e of entries) {
     await cronQueue.add(e.name, {}, { repeat: { pattern: e.cron }, jobId: `cron:${e.name}`, removeOnComplete: 100, removeOnFail: 100 });

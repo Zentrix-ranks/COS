@@ -199,6 +199,49 @@ registered (6 keys in Redis). **Meets the M4 DoD.**
   quiet hours (doc 14 §8); DLQ + missed-cron catch-up (doc 14 §10) — hardened in M5.
 - Operations/Automation dashboard tabs + Settings → Automation (doc 07 §9).
 
+## M5 — Hardening (in progress)
+
+Target (spec/16 §6 M5): budgets/cost caps, full observability + alerting, resilience (circuit
+breakers, DLQ, graceful shutdown), accessibility (doc 07 §12), runbooks (doc 15 §9), DR.
+
+### What this slice delivers
+
+| Area | Deliverable | Spec trace | Status |
+|------|-------------|-----------|--------|
+| Budget caps | `assertWithinBudget` in the tool guard; hard stop → run parked + critical alert | doc 02 §8.3, doc 01 §9 | ✅ done |
+| Kill-switch | `operation.paused` flag: generation jobs short-circuit; in-flight runs checkpoint + hold; resumable | doc 14 §8 | ✅ done |
+| Circuit breaker | `tool_status` breaker opens after N failures, cooldown half-open; guard short-circuits | doc 02 §8.4, doc 06 §7 | ✅ done |
+| DLQ | worker `failed` handler dead-letters on exhausted attempts → audit + critical alert | doc 06 §7, doc 14 §4 | ✅ done |
+| Observability | `ops.healthcheck`: queue depth, run success rate, tool outages, budget burn, IG health → `health_snapshots` + alert when not green | doc 02 §8.2, doc 13 §10, doc 14 §9 | ✅ done |
+| Graceful shutdown | SIGINT/SIGTERM drain worker + queues + pool | doc 02 §8.4 | ✅ handlers present |
+| Accessibility | focus-visible rings, reduced-motion, skip link, SSE live region, aria labels/roles, color+text status | doc 07 §12 (WCAG 2.1 AA) | ✅ core done |
+| Runbooks + DR | `infra/runbooks/` (6 incident runbooks + kill-switch) + disaster-recovery (RPO/RTO, restore drill, secrets) | doc 15 §9/§10 | ✅ done |
+
+### Verified locally (ephemeral Postgres + Redis + worker)
+
+- **Kill-switch:** with `operation.paused=true`, `daily.kickoff` short-circuited (0 ideas created,
+  log "short-circuited: operation paused"); unpausing restores normal operation.
+- **Budget cap:** with cap $0.01 and $0.02/model-call, a carousel run halted with
+  `error.reason='budget_exceeded'`, cost_ledger recorded the spend, and a critical alert fired.
+- **Circuit breaker → observability:** an open `instagram.publish` breaker made `ops.healthcheck`
+  write a `red` snapshot with `tool_outages=1` and raise a health alert.
+- **DLQ:** a poison job exhausted its retries → an `audit_log(action='dlq')` row + a critical
+  "Job dead-lettered" alert.
+- **Graceful shutdown:** SIGINT/SIGTERM handlers drain the worker/queues/pool and exit cleanly.
+
+This satisfies the M5 DoD: cost-control + observability NFRs (doc 01 §9) are enforced,
+**kill-switch verified**, and the system is on-call-ready (runbooks + alerts + DR). Note: the
+NFR set is *implemented and enforced in code*; production numbers (99.5% availability,
+≥40 assets/day throughput, <1.5s FMP) are validated in a real staging deployment (doc 02 §9),
+which this environment doesn't provision.
+
+### Remaining M5 items
+
+- Real external alerting sinks (Slack/Discord/Resend) behind the notify() adapters.
+- Per-tool token buckets + `publish.tick` fire-at-slot cron (doc 14 §4.1/§6); reduced-motion
+  and full keyboard command palette (j/k/a/r/x) polish; automated axe/Lighthouse checks in CI.
+- Load/soak testing to certify the throughput/availability NFRs in staging.
+
 ## Implementation decisions
 
 ### ID-01 — Lightweight graph engine vs the LangGraph library

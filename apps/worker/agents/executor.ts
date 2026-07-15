@@ -129,7 +129,7 @@ export async function runStage<K extends CreativeStageKey>(
   // 4. Guarded model call (doc 02 §6.3). Model access is a permitted tool for the agent.
   const schema = CREATIVE_SCHEMAS[spec.kind] as z.ZodType<z.infer<(typeof CREATIVE_SCHEMAS)[K]>>;
   const result = await guardedToolCall(
-    { agentId: spec.agentId, allowedTools: [...agent.tools, 'openrouter.generate'] },
+    { agentId: spec.agentId, allowedTools: [...agent.tools, 'openrouter.generate'], db },
     'openrouter.generate',
     () =>
       provider.generate({

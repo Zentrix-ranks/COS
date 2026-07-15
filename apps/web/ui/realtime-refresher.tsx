@@ -38,8 +38,14 @@ export function RealtimeRefresher() {
   const dot = conn === 'live' ? 'bg-emerald-400' : conn === 'connecting' ? 'bg-amber-400' : 'bg-slate-500';
 
   return (
-    <span className="inline-flex items-center gap-2 text-xs text-muted" title="Realtime stream (SSE)">
-      <span className={`h-2 w-2 rounded-full ${dot} ${conn === 'live' ? 'animate-pulse' : ''}`} />
+    // Live region announces connection changes to assistive tech (doc 07 §12).
+    <span
+      role="status"
+      aria-live="polite"
+      className="inline-flex items-center gap-2 text-xs text-muted"
+      title="Realtime stream (SSE)"
+    >
+      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot} ${conn === 'live' ? 'animate-pulse' : ''}`} />
       realtime: {label}
     </span>
   );

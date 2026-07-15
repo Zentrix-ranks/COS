@@ -17,6 +17,7 @@
     "publishing/**/*.ts",
     "analytics/**/*.ts",
     "comms/**/*.ts",
-    "notify/**/*.ts"
+    "notify/**/*.ts",
+    "ops/**/*.ts"
   ]
 }

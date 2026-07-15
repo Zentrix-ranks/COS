@@ -12,6 +12,7 @@
     "enqueue:resume": "tsx src/enqueue-resume.ts",
     "enqueue:learn": "tsx src/enqueue-learn.ts",
     "enqueue:daily": "tsx src/enqueue-daily.ts",
+    "enqueue:health": "tsx src/enqueue-health.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

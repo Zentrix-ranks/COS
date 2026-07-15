@@ -36,6 +36,7 @@ export function ApprovalActions({ approvalId }: { approvalId: string }) {
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Optional note (learned from — doc 05)"
+        aria-label="Decision note (optional)"
         className="w-full rounded border border-edge bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
       />
       <div className="flex flex-wrap gap-2">
@@ -61,7 +62,11 @@ export function ApprovalActions({ approvalId }: { approvalId: string }) {
           Reject
         </button>
       </div>
-      {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-xs text-rose-400">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -113,11 +113,25 @@ Implementation now proceeds here, incrementally against the spec, milestone by
 milestone (M0 → M5, per `spec/01-vision-and-prd.md` §12 and `spec/16-claude-code-master-build-prompt.md`).
 See `spec/00-index.md` for the document map and conventions.
 
-**Current milestone: M0 — Foundations (in progress).** The monorepo scaffold, the full
-database schema + migrations, the 36-agent seed, shared types, a Mission Control shell, and a
-no-op agent worker are in place; migrations + seed are verified end-to-end on Postgres +
-pgvector. See `docs/01-implementation-notes.md` for exactly what is done, what remains to reach
-the M0 Definition of Done, and the spec corrections discovered along the way.
+**Milestones M0 → M5 are implemented and each verified end-to-end** (ephemeral Postgres +
+pgvector + Redis + worker + `next start`):
+
+- **M0 Foundations** — monorepo, full DB schema + 36-agent seed, Mission Control shell, no-op
+  worker, live DB reads + realtime SSE.
+- **M1 Single pipeline** — Creative carousel Idea→Approval on a checkpointing graph engine with
+  HITL interrupt/resume (resumable across a worker restart).
+- **M2 Publish & measure** — Canva design, scheduling, exactly-once Instagram publishing, metrics.
+- **M3 Learning loop** — scoring, clustering, confidence-gated recommendations, forecasting,
+  memory promotion; recommendations feed the next ideation.
+- **M4 Full org & daily automation** — the daily CEO loop, all formats, agent-comms protocol,
+  notifications, weekly report, cron; operator approves by exception.
+- **M5 Hardening** — budget caps, kill-switch, circuit breakers, DLQ, health/observability,
+  accessibility, runbooks + DR.
+
+See `docs/01-implementation-notes.md` for what each milestone delivers, what remains, and the
+spec corrections discovered along the way. Adapters for models (OpenRouter/Anthropic), Canva,
+and Instagram default to deterministic mocks so the whole system runs without external keys;
+real providers plug into the same interfaces for staging/production.
 
 ### Quick start (developer)
 

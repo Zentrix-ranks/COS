@@ -43,7 +43,9 @@ export class MockProvider implements ModelProvider {
     const output = args.schema.parse(raw);
     const tokens_in = Math.ceil((args.system.length + args.user.length) / 4);
     const tokens_out = Math.ceil(JSON.stringify(raw).length / 4);
-    return { output, usage: { tokens_in, tokens_out, cost_usd: 0 } };
+    // Cost is $0 by default; COS_MOCK_COST_USD lets tests exercise budget caps (doc 02 §8.3).
+    const cost_usd = Number(process.env.COS_MOCK_COST_USD ?? 0);
+    return { output, usage: { tokens_in, tokens_out, cost_usd } };
   }
 }
 
