@@ -242,6 +242,34 @@ which this environment doesn't provision.
   and full keyboard command palette (j/k/a/r/x) polish; automated axe/Lighthouse checks in CI.
 - Load/soak testing to certify the throughput/availability NFRs in staging.
 
+## Milestone tails (operator surfaces + CI)
+
+Cross-cutting follow-ups from M0–M5, all verified against a seeded DB via `next start`.
+
+| Deliverable | Spec trace | Status |
+|-------------|-----------|--------|
+| Run Inspector (`/runs`, `/runs/[id]`) — run list + timeline of run_steps (agent, memories used, reasoning, cost, tool calls) and where an HITL interrupt occurred | doc 07 §8, doc 05 §9 | ✅ verified |
+| Operations tab (`/operations`) — system health, tool-status matrix (breaker state), cost dashboard, DLQ, paused banner | doc 07 §6.4, doc 02 §8 | ✅ verified |
+| Settings → Automation (`/settings` + `POST /api/settings`) — daily budget cap, auto-approve policy, and the **UI kill-switch** (pause/resume) | doc 07 §9, doc 14 §11 | ✅ verified |
+| Publishing tab (`/publishing`) — per-platform scheduled + published with permalinks and reach | doc 07 §6.3 | ✅ verified |
+| CI workflow (`.github/workflows/ci.yml`) — typecheck + web build + migrate/seed on a throwaway Postgres+pgvector, with a 36-agent + referential-integrity assertion | doc 15, doc 04 §15 | ✅ authored |
+
+Verified: `/runs` lists runs; the inspector renders the stage timeline; `/operations` shows
+health + tools + cost; `/publishing` shows published assets with reach; `/settings` exposes the
+kill-switch — toggling it via `POST /api/settings` set `operation.paused=true` in the DB and
+surfaced the paused banner on Operations, then resumed and updated the budget.
+
+### Still open (need external infra or larger refactors)
+
+- Real provider adapters (OpenRouter/Anthropic, IG Graph, Canva) behind the existing interfaces
+  — need API keys/OAuth + a test IG account; mocks remain the keyless default.
+- Embeddings on memory/KB write → true vector recall (recency+filter fallback today).
+- Decouple publishing to a `publish.tick` fire-at-slot cron + per-tool token buckets (M2 still
+  publishes inline right after scheduling).
+- `realized_lift` measurement to fully close the learning self-correction loop (doc 13 §7.1).
+- Supabase Auth/session wiring; automated axe/Lighthouse in CI; load/soak tests to certify the
+  throughput/availability NFRs in a real staging deployment.
+
 ## Implementation decisions
 
 ### ID-01 — Lightweight graph engine vs the LangGraph library

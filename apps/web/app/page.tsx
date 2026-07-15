@@ -98,6 +98,15 @@ export default async function MissionControl() {
           <a href="/analytics" className="text-sm text-accent hover:underline">
             Analytics
           </a>
+          <a href="/publishing" className="text-sm text-accent hover:underline">
+            Publishing
+          </a>
+          <a href="/runs" className="text-sm text-accent hover:underline">
+            Runs
+          </a>
+          <a href="/operations" className="text-sm text-accent hover:underline">
+            Operations
+          </a>
           <RealtimeRefresher />
           <StatusPill label={health?.ig_health ?? health?.overall ?? (offline ? 'Unknown' : 'Excellent')} />
         </div>
