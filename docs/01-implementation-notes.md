@@ -275,11 +275,23 @@ then `publish.tick` published it + collected metrics, and a second tick left exa
 publication (exactly-once); an accepted recommendation was re-measured to `realized_lift=0.152`,
 `status=measured`.
 
+### Tail batch 3 — delivered & verified
+
+| Deliverable | Spec trace | Status |
+|-------------|-----------|--------|
+| Per-stage model routing — the executor routes each call from the agent's `model_policy` (tier/route/temperature); the intended model is recorded on `cost_ledger` | doc 09 §7 | ✅ verified |
+| Per-tool token buckets — a Redis fixed-window limiter in the tool guard (rate-limit step), configurable per tool | doc 08 §2.1, doc 02 §6.3 | ✅ verified |
+| Embedding backfill — `memory.embed_backfill` job (+ nightly cron) embeds any memory_episodes / kb_chunks with a null embedding | doc 05 §10/§14 | ✅ verified |
+
+Verified (ephemeral Postgres + Redis + worker): a carousel run recorded real per-agent routes on
+`cost_ledger` (creative_director→opus, hook/carousel/brand writers→sonnet, cta_specialist→haiku;
+zero `mock`); the token bucket allowed 3 then denied at a limit of 3; the backfill job took 3
+null-embedding episodes to 0.
+
 ### Still open (need external infra)
 
-- Real IG Graph + Canva adapters (need a test IG token + Canva OAuth); OpenRouter needs a key.
-- Per-agent per-stage model routing from `model_policy` (OpenRouter uses a default model now);
-  per-tool Redis token buckets; embedding backfill job for pre-existing rows.
+- Real IG Graph + Canva adapters (need a test IG token + Canva OAuth); OpenRouter needs a key
+  (per-stage routing now feeds real model ids to the provider once a key is set).
 - Supabase Auth/session wiring; automated axe/Lighthouse in CI; load/soak tests to certify the
   throughput/availability NFRs in a real staging deployment.
 

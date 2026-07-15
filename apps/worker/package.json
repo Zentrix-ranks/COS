@@ -14,6 +14,7 @@
     "enqueue:daily": "tsx src/enqueue-daily.ts",
     "enqueue:health": "tsx src/enqueue-health.ts",
     "enqueue:tick": "tsx src/enqueue-tick.ts",
+    "enqueue:backfill": "tsx src/enqueue-backfill.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

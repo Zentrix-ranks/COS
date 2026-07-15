@@ -36,6 +36,8 @@ export const JOBS = {
   publishTick: 'publish.tick',
   /** Tail: idempotently publish + measure one asset at its slot (doc 14 §4.1). */
   publishFire: 'publish.fire',
+  /** Tail: backfill embeddings for rows stored without one (doc 05 §10/§14). */
+  embedBackfill: 'memory.embed_backfill',
 } as const;
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];

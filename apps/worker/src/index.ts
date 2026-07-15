@@ -18,6 +18,7 @@ import { isOperationPaused } from '../ops/governance.js';
 import { notify } from '../notify/notify.js';
 import { firePublish } from '../publishing/fire.js';
 import { publishTick } from '../publishing/tick.js';
+import { backfillEmbeddings } from '../memory/backfill.js';
 import { type PipelineDeps, resumeCarousel, startCarousel } from '../orchestrator/carousel-run.js';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
@@ -90,6 +91,9 @@ const worker = new Worker(
         const data = job.data as { assetId: string };
         return firePublish(db, tools, data.assetId);
       }
+      case JOBS.embedBackfill: {
+        return backfillEmbeddings(db);
+      }
       default:
         throw new Error(`Unknown job on ${QUEUES.runs}: ${job.name}`);
     }
@@ -133,6 +137,7 @@ async function registerCron(): Promise<void> {
     { name: JOBS.weeklyReport, cron: '0 9 * * 1' }, // Monday weekly report
     { name: JOBS.healthcheck, cron: '*/5 * * * *' }, // tools/queues/budgets health
     { name: JOBS.publishTick, cron: '*/15 * * * *' }, // fire schedules due now (idempotent)
+    { name: JOBS.embedBackfill, cron: '15 2 * * *' }, // backfill missing embeddings nightly
   ];
   for (const e of entries) {
     await cronQueue.add(e.name, {}, { repeat: { pattern: e.cron }, jobId: `cron:${e.name}`, removeOnComplete: 100, removeOnFail: 100 });

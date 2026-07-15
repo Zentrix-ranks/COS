@@ -43,7 +43,15 @@ export interface StageSpec<K extends CreativeStageKey> {
 
 let seq = 0;
 
-async function loadAgent(db: Pool, id: string): Promise<AgentContractLite> {
+export interface ModelPolicy {
+  tier?: string;
+  route?: string;
+  temperature?: number;
+  fallbacks?: string[];
+}
+type LoadedAgent = AgentContractLite & { modelPolicy: ModelPolicy };
+
+async function loadAgent(db: Pool, id: string): Promise<LoadedAgent> {
   const { rows } = await db.query<{
     id: string;
     name: string;
@@ -53,14 +61,15 @@ async function loadAgent(db: Pool, id: string): Promise<AgentContractLite> {
     tools: string[];
     reports_to: string | null;
     eval_policy: { primary?: string };
+    model_policy: ModelPolicy | null;
   }>(
-    `select id, name, department, goal, responsibilities, tools, reports_to, eval_policy
+    `select id, name, department, goal, responsibilities, tools, reports_to, eval_policy, model_policy
        from agents where id = $1`,
     [id],
   );
   const a = rows[0];
   if (!a) throw new Error(`Agent '${id}' not found (seed the agents table)`);
-  const lite: AgentContractLite = {
+  const lite: LoadedAgent = {
     id: a.id,
     name: a.name,
     department: a.department,
@@ -68,6 +77,7 @@ async function loadAgent(db: Pool, id: string): Promise<AgentContractLite> {
     responsibilities: a.responsibilities ?? [],
     tools: a.tools ?? [],
     reports_to: a.reports_to,
+    modelPolicy: a.model_policy ?? {},
   };
   if (a.eval_policy?.primary) lite.eval_primary = a.eval_policy.primary;
   return lite;
@@ -130,6 +140,12 @@ export async function runStage<K extends CreativeStageKey>(
 
   // 4. Guarded model call (doc 02 §6.3). Model access is a permitted tool for the agent.
   const schema = CREATIVE_SCHEMAS[spec.kind] as z.ZodType<z.infer<(typeof CREATIVE_SCHEMAS)[K]>>;
+  // Per-stage model routing from the agent's model_policy (doc 09 §7). The mock provider ignores
+  // the route; real providers (OpenRouter) honor it. The intended model is recorded on cost_ledger.
+  const route = {
+    model: agent.modelPolicy.route ?? 'mock',
+    temperature: agent.modelPolicy.temperature ?? 0.7,
+  };
   const result = await guardedToolCall(
     { agentId: spec.agentId, allowedTools: [...agent.tools, 'openrouter.generate'], db },
     'openrouter.generate',
@@ -140,7 +156,7 @@ export async function runStage<K extends CreativeStageKey>(
         system,
         user,
         schema,
-        route: { model: 'mock', temperature: 0.7 },
+        route,
         ctx: promptCtx,
       }),
   );
@@ -178,7 +194,7 @@ export async function runStage<K extends CreativeStageKey>(
   await db.query(
     `insert into cost_ledger (run_id, agent_id, provider, model, tokens_in, tokens_out, usd)
      values ($1,$2,$3,$4,$5,$6,$7)`,
-    [runId, spec.agentId, provider.name, 'mock', result.usage.tokens_in, result.usage.tokens_out, result.usage.cost_usd],
+    [runId, spec.agentId, provider.name, route.model, result.usage.tokens_in, result.usage.tokens_out, result.usage.cost_usd],
   );
 
   // 9. Write an episode (doc 05 §5). Winning drafts feed future recall.

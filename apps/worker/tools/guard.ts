@@ -5,6 +5,7 @@
 // invoke → record breaker result.
 import type { Pool } from '@cos/db';
 import { BreakerOpenError, checkBreaker, recordToolResult } from './breaker.js';
+import { RateLimitError, takeToken } from './ratelimit.js';
 import { assertWithinBudget } from '../ops/governance.js';
 
 export interface ToolContext {
@@ -23,7 +24,7 @@ export class ToolPermissionError extends Error {
   }
 }
 
-export { BreakerOpenError };
+export { BreakerOpenError, RateLimitError };
 
 export async function guardedToolCall<T>(ctx: ToolContext, tool: string, invoke: () => Promise<T>): Promise<T> {
   // 1. Permission gate (doc 02 §6.3 step 1).
@@ -32,9 +33,12 @@ export async function guardedToolCall<T>(ctx: ToolContext, tool: string, invoke:
   }
   if (!ctx.db) return invoke();
 
-  // 2. Circuit breaker (doc 06 §7): short-circuit rather than retry-storm a downed tool.
+  // 2. Rate limit (doc 02 §6.3 step 2, doc 08 §2.1): per-tool token bucket.
+  const rl = await takeToken(tool);
+  if (!rl.allowed) throw new RateLimitError(tool);
+  // 3. Circuit breaker (doc 06 §7): short-circuit rather than retry-storm a downed tool.
   await checkBreaker(ctx.db, tool);
-  // 3. Budget cap (doc 02 §8.3): hard stop before spending more when the daily cap is hit.
+  // 4. Budget cap (doc 02 §8.3): hard stop before spending more when the daily cap is hit.
   await assertWithinBudget(ctx.db);
 
   // 4. Invoke + record breaker result (success closes, failures may open the breaker).
